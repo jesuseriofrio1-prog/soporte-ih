@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* ================================
+   SKINNA — Tema personalizado
+   ================================ */
+
+@theme {
+  --color-navy: #030363;
+  --color-lavanda: #E6E6FB;
+  --color-lavanda-medio: #C8C8E9;
+  --color-mauve: #C49BC2;
+  --color-wa-green: #25D366;
+  --color-alerta: #EF4444;
+}
+
+/* ================================
+   Estilos base
+   ================================ */
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  min-height: 100vh;
+}
