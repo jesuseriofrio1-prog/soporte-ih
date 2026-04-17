@@ -40,14 +40,17 @@ export const PLANTILLA_LABELS: Record<PlantillaWA, string> = {
 /** Sugiere una plantilla según el estado del pedido */
 export function sugerirPlantilla(estado: string): PlantillaWA {
   switch (estado) {
-    case 'INGRESANDO':
-    case 'EN_TRANSITO':
+    case 'PENDIENTE':
+    case 'CONFIRMADO':
+    case 'EN_PREPARACION':
+    case 'ENVIADO':
       return 'NUEVO'
-    case 'EN_AGENCIA':
+    case 'RETIRO_EN_AGENCIA':
       return 'LLEGO_AGENCIA'
-    case 'EN_REPARTO':
+    case 'EN_RUTA':
       return 'REPARTO'
     case 'NOVEDAD':
+    case 'NO_ENTREGADO':
       return 'NOVEDAD_DOMICILIO'
     default:
       return 'LIBRE'

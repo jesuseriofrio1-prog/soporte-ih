@@ -132,15 +132,7 @@ SELECT
 FROM pedidos p;
 
 -- ===================
--- 6. Datos de ejemplo
--- ===================
-
-INSERT INTO productos (slug, nombre, precio, stock, icono) VALUES
-  ('serum-hidra',  'Sérum Hidratante',  25.00, 45, 'fas fa-tint'),
-  ('crema-noche',  'Crema Facial Noche', 35.00, 12, 'fas fa-spa');
-
--- ===================
--- 7. RLS (Row Level Security)
+-- 6. RLS (Row Level Security)
 -- ===================
 
 -- Habilitar RLS en todas las tablas

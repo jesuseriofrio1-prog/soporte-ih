@@ -17,10 +17,13 @@ app.use(createPinia())
 // Vue Router
 app.use(router)
 
-// PrimeVue con tema Aura
+// PrimeVue con tema Aura (light mode)
 app.use(PrimeVue, {
   theme: {
     preset: Aura,
+    options: {
+      darkModeSelector: '.force-dark-never',
+    },
   },
 })
 

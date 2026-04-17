@@ -6,6 +6,7 @@ import pedidosService, {
   type CreatePedidoPayload,
   type EstadoPedido,
 } from '../services/pedidosService'
+import { useTiendaStore } from './tienda'
 
 export const usePedidosStore = defineStore('pedidos', () => {
   const pedidos = ref<Pedido[]>([])
@@ -17,16 +18,19 @@ export const usePedidosStore = defineStore('pedidos', () => {
     loading.value = true
     error.value = null
     try {
-      pedidos.value = await pedidosService.getAll(filtros.value)
-    } catch (e: any) {
-      error.value = e.response?.data?.message || 'Error al cargar pedidos'
+      const tiendaStore = useTiendaStore()
+      pedidos.value = await pedidosService.getAll({ ...filtros.value, tienda_id: tiendaStore.tiendaActiva?.id })
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      error.value = err.response?.data?.message || 'Error al cargar pedidos'
     } finally {
       loading.value = false
     }
   }
 
   async function crearPedido(payload: CreatePedidoPayload) {
-    const nuevo = await pedidosService.create(payload)
+    const tiendaStore = useTiendaStore()
+    const nuevo = await pedidosService.create({ ...payload, tienda_id: tiendaStore.tiendaActiva?.id ?? payload.tienda_id })
     pedidos.value.unshift(nuevo)
     return nuevo
   }

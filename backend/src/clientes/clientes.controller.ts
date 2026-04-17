@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -17,8 +18,18 @@ export class ClientesController {
   constructor(private readonly clientesService: ClientesService) {}
 
   @Get()
-  findAll(@Query('q') q?: string) {
-    return this.clientesService.findAll(q);
+  findAll(
+    @Query('tienda_id') tienda_id: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.clientesService.findAll(
+      tienda_id,
+      q,
+      limit ? parseInt(limit, 10) : undefined,
+      offset ? parseInt(offset, 10) : undefined,
+    );
   }
 
   @Get(':id')
@@ -37,5 +48,10 @@ export class ClientesController {
     @Body() dto: UpdateClienteDto,
   ) {
     return this.clientesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clientesService.remove(id);
   }
 }

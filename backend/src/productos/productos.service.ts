@@ -11,9 +11,9 @@ import { UpdateProductoDto } from './dto/update-producto.dto';
 export class ProductosService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  /** Listar productos, filtrado por activo (default true) */
-  async findAll(activo?: boolean) {
-    let query = this.supabase.getClient().from('productos').select('*');
+  /** Listar productos, filtrado por tienda y activo (default true) */
+  async findAll(tiendaId: string, activo?: boolean) {
+    let query = this.supabase.getClient().from('productos').select('*').eq('tienda_id', tiendaId);
 
     if (activo !== undefined) {
       query = query.eq('activo', activo);
@@ -45,13 +45,18 @@ export class ProductosService {
 
   /** Crear un producto nuevo */
   async create(dto: CreateProductoDto) {
-    // Verificar que el slug no exista
-    const { data: existente } = await this.supabase
+    // Verificar que el slug no exista en la misma tienda
+    const { data: existente, error: errBusca } = await this.supabase
       .getClient()
       .from('productos')
       .select('id')
       .eq('slug', dto.slug)
+      .eq('tienda_id', dto.tienda_id)
       .single();
+
+    if (errBusca && errBusca.code !== 'PGRST116') {
+      throw errBusca;
+    }
 
     if (existente) {
       throw new ConflictException(`Ya existe un producto con slug "${dto.slug}"`);

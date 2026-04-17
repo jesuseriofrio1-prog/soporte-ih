@@ -6,22 +6,28 @@ defineProps<{
 }>()
 
 const estadoColores: Record<string, string> = {
-  INGRESANDO: 'bg-gray-400',
-  EN_TRANSITO: 'bg-blue-500',
-  EN_AGENCIA: 'bg-purple-500',
-  EN_REPARTO: 'bg-yellow-500',
-  ENTREGADO: 'bg-green-500',
+  PENDIENTE: 'bg-gray-400',
+  CONFIRMADO: 'bg-blue-500',
+  EN_PREPARACION: 'bg-indigo-500',
+  ENVIADO: 'bg-cyan-500',
+  EN_RUTA: 'bg-yellow-500',
   NOVEDAD: 'bg-orange-500',
-  DEVUELTO: 'bg-red-500',
+  RETIRO_EN_AGENCIA: 'bg-purple-500',
+  ENTREGADO: 'bg-green-500',
+  NO_ENTREGADO: 'bg-red-500',
+  DEVUELTO: 'bg-red-800',
 }
 
 const estadoLabels: Record<string, string> = {
-  INGRESANDO: 'Ingresando',
-  EN_TRANSITO: 'En Tránsito',
-  EN_AGENCIA: 'En Agencia',
-  EN_REPARTO: 'En Reparto',
-  ENTREGADO: 'Entregado',
+  PENDIENTE: 'Pendiente',
+  CONFIRMADO: 'Confirmado',
+  EN_PREPARACION: 'En Preparación',
+  ENVIADO: 'Enviado',
+  EN_RUTA: 'En Ruta',
   NOVEDAD: 'Novedad',
+  RETIRO_EN_AGENCIA: 'Retiro en Agencia',
+  ENTREGADO: 'Entregado',
+  NO_ENTREGADO: 'No Entregado',
   DEVUELTO: 'Devuelto',
 }
 

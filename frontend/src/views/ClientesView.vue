@@ -4,10 +4,115 @@ import { useToast } from 'vue-toastification'
 import Drawer from 'primevue/drawer'
 import { useClientesStore } from '../stores/clientes'
 import { abrirWhatsApp } from '../composables/useWhatsApp'
+import Dialog from 'primevue/dialog'
+import Swal from 'sweetalert2'
+import clientesService from '../services/clientesService'
 import type { Cliente } from '../services/clientesService'
 
 const toast = useToast()
 const store = useClientesStore()
+
+// Modal crear cliente
+const crearModalVisible = ref(false)
+const crearLoading = ref(false)
+const crearForm = ref({ nombre: '', telefono: '', ciudad: '', notas: '' })
+
+function abrirCrearCliente() {
+  crearForm.value = { nombre: '', telefono: '', ciudad: '', notas: '' }
+  crearModalVisible.value = true
+}
+
+async function guardarNuevoCliente() {
+  if (!crearForm.value.nombre.trim()) {
+    toast.warning('El nombre es requerido')
+    return
+  }
+  if (!crearForm.value.telefono.trim()) {
+    toast.warning('El teléfono es requerido')
+    return
+  }
+
+  crearLoading.value = true
+  try {
+    await clientesService.create({
+      nombre: crearForm.value.nombre,
+      telefono: crearForm.value.telefono,
+      ciudad: crearForm.value.ciudad || undefined,
+      notas: crearForm.value.notas || undefined,
+    })
+    toast.success('Cliente creado')
+    crearModalVisible.value = false
+    store.fetchClientes(busqueda.value || undefined)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message || 'Error al crear cliente')
+  } finally {
+    crearLoading.value = false
+  }
+}
+
+// Eliminar cliente
+async function eliminarCliente(cliente: Cliente) {
+  const result = await Swal.fire({
+    title: '¿Eliminar cliente?',
+    text: `Se eliminará "${cliente.nombre}" permanentemente.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#EF4444',
+    cancelButtonColor: '#C8C8E9',
+    confirmButtonText: 'Sí, eliminar',
+    cancelButtonText: 'Cancelar',
+  })
+
+  if (result.isConfirmed) {
+    try {
+      await clientesService.remove(cliente.id)
+      toast.success('Cliente eliminado')
+      store.fetchClientes(busqueda.value || undefined)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      toast.error(err.response?.data?.message || 'Error al eliminar. El cliente puede tener pedidos asociados.')
+    }
+  }
+}
+
+// Edición de cliente
+const editandoCliente = ref(false)
+const editClienteForm = ref({ nombre: '', telefono: '', ciudad: '', notas: '' })
+
+function iniciarEdicionCliente() {
+  if (!store.clienteActivo) return
+  editClienteForm.value = {
+    nombre: store.clienteActivo.nombre,
+    telefono: store.clienteActivo.telefono,
+    ciudad: store.clienteActivo.ciudad || '',
+    notas: store.clienteActivo.notas || '',
+  }
+  editandoCliente.value = true
+}
+
+async function guardarEdicionCliente() {
+  if (!store.clienteActivo) return
+  if (!editClienteForm.value.nombre.trim()) {
+    toast.warning('El nombre es requerido')
+    return
+  }
+  try {
+    await clientesService.update(store.clienteActivo.id, {
+      nombre: editClienteForm.value.nombre,
+      telefono: editClienteForm.value.telefono || undefined,
+      ciudad: editClienteForm.value.ciudad || undefined,
+      notas: editClienteForm.value.notas || undefined,
+    })
+    toast.success('Cliente actualizado')
+    editandoCliente.value = false
+    await store.fetchClienteDetalle(store.clienteActivo.id)
+    store.fetchClientes(busqueda.value || undefined)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message || 'Error al actualizar cliente')
+  }
+}
 
 // Búsqueda con debounce
 const busqueda = ref('')
@@ -62,13 +167,16 @@ function formatFecha(fecha: string): string {
 
 // Estilos de badge de estado
 const estadoEstilos: Record<string, string> = {
-  INGRESANDO: 'bg-gray-100 text-gray-700',
-  EN_TRANSITO: 'bg-blue-100 text-blue-700',
-  EN_AGENCIA: 'bg-purple-100 text-purple-700',
-  EN_REPARTO: 'bg-yellow-100 text-yellow-700',
-  ENTREGADO: 'bg-green-100 text-green-700',
+  PENDIENTE: 'bg-gray-100 text-gray-700',
+  CONFIRMADO: 'bg-blue-100 text-blue-700',
+  EN_PREPARACION: 'bg-indigo-100 text-indigo-700',
+  ENVIADO: 'bg-cyan-100 text-cyan-700',
+  EN_RUTA: 'bg-yellow-100 text-yellow-700',
   NOVEDAD: 'bg-orange-100 text-orange-700',
-  DEVUELTO: 'bg-red-100 text-red-700',
+  RETIRO_EN_AGENCIA: 'bg-purple-100 text-purple-700',
+  ENTREGADO: 'bg-green-100 text-green-700',
+  NO_ENTREGADO: 'bg-red-100 text-red-700',
+  DEVUELTO: 'bg-red-200 text-red-800',
 }
 
 function enviarWA(telefono: string, nombre: string) {
@@ -86,7 +194,8 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-lavanda-medio">
       <h3 class="text-xl font-bold text-navy">Base de Clientes Frecuentes</h3>
-      <div class="relative">
+      <div class="flex items-center gap-3">
+        <div class="relative">
         <input
           v-model="busqueda"
           @input="onBuscar"
@@ -95,6 +204,13 @@ onMounted(() => {
           class="p-2 pl-9 bg-lavanda/50 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-sm text-navy min-w-[250px]"
         />
         <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-mauve text-sm"></i>
+        </div>
+        <button
+          @click="abrirCrearCliente"
+          class="bg-mauve text-white px-4 py-2 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
+        >
+          <i class="pi pi-plus"></i> Nuevo Cliente
+        </button>
       </div>
     </div>
 
@@ -132,20 +248,28 @@ onMounted(() => {
               </div>
             </td>
 
-            <!-- Pedidos (se mostrará al ver detalle, aquí placeholder) -->
-            <td class="p-4 text-center font-bold text-mauve text-lg">—</td>
+            <!-- Pedidos Totales -->
+            <td class="p-4 text-center font-bold text-mauve text-lg">{{ cliente.pedidos_total }}</td>
 
-            <!-- Monto -->
-            <td class="p-4 font-bold text-navy">—</td>
+            <!-- Monto Comprado -->
+            <td class="p-4 font-bold text-navy">${{ Number(cliente.monto_total).toFixed(2) }}</td>
 
             <!-- Acción -->
             <td class="p-4 text-center">
-              <button
-                @click="verPerfil(cliente)"
-                class="bg-lavanda-medio text-navy px-3 py-1.5 rounded-lg font-medium hover:bg-mauve hover:text-white transition text-xs"
-              >
-                <i class="pi pi-user-edit mr-1"></i> Ver Perfil
-              </button>
+              <div class="flex items-center justify-center gap-1">
+                <button
+                  @click="verPerfil(cliente)"
+                  class="bg-lavanda-medio text-navy px-3 py-1.5 rounded-lg font-medium hover:bg-mauve hover:text-white transition text-xs"
+                >
+                  <i class="pi pi-user-edit mr-1"></i> Ver Perfil
+                </button>
+                <button
+                  @click="eliminarCliente(cliente)"
+                  class="px-3 py-1.5 rounded-lg bg-alerta text-white hover:bg-red-600 transition text-xs font-bold flex items-center gap-1"
+                >
+                  <i class="pi pi-times text-xs"></i> Eliminar
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -205,17 +329,53 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Botón WA -->
-          <button
-            @click="enviarWA(store.clienteActivo.telefono, store.clienteActivo.nombre)"
-            class="mt-4 inline-flex items-center gap-2 bg-wa-green text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition"
-          >
-            <i class="pi pi-whatsapp"></i> Enviar WhatsApp
-          </button>
+          <!-- Botones -->
+          <div class="flex justify-center gap-2 mt-4">
+            <button
+              @click="enviarWA(store.clienteActivo.telefono, store.clienteActivo.nombre)"
+              class="inline-flex items-center gap-2 bg-wa-green text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition"
+            >
+              <i class="pi pi-whatsapp"></i> WA
+            </button>
+            <button
+              @click="iniciarEdicionCliente"
+              class="inline-flex items-center gap-2 border border-lavanda-medio text-navy px-4 py-2 rounded-lg text-sm font-bold hover:bg-lavanda transition"
+            >
+              <i class="pi pi-pencil"></i> Editar
+            </button>
+          </div>
+        </div>
+
+        <!-- Formulario edición cliente -->
+        <div v-if="editandoCliente" class="p-5 border-b border-lavanda-medio space-y-3">
+          <div>
+            <label class="block text-xs font-bold text-navy mb-1">Nombre</label>
+            <input v-model="editClienteForm.nombre" type="text" class="w-full px-3 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy text-sm focus:outline-none focus:border-mauve" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-navy mb-1">Teléfono</label>
+            <input v-model="editClienteForm.telefono" type="text" class="w-full px-3 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy text-sm focus:outline-none focus:border-mauve" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-navy mb-1">Ciudad</label>
+            <input v-model="editClienteForm.ciudad" type="text" placeholder="Quito, Guayaquil..." class="w-full px-3 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy text-sm focus:outline-none focus:border-mauve" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-navy mb-1">Notas</label>
+            <textarea v-model="editClienteForm.notas" rows="2" placeholder="Notas sobre el cliente..." class="w-full px-3 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy text-sm focus:outline-none focus:border-mauve resize-none"></textarea>
+          </div>
+          <div class="flex gap-2">
+            <button @click="editandoCliente = false" class="px-3 py-1.5 text-xs font-bold border border-lavanda-medio rounded-lg text-navy hover:bg-lavanda transition">
+              Cancelar
+            </button>
+            <button @click="guardarEdicionCliente" class="px-3 py-1.5 text-xs font-bold bg-mauve text-white rounded-lg hover:opacity-90 transition">
+              Guardar
+            </button>
+          </div>
         </div>
 
         <!-- Notas -->
-        <div v-if="store.clienteActivo.notas" class="px-6 py-3 bg-yellow-50 border-b border-lavanda-medio">
+        <div v-if="store.clienteActivo.notas && !editandoCliente" class="px-6 py-3 bg-yellow-50 border-b border-lavanda-medio">
           <p class="text-xs font-bold text-navy/60 mb-1"><i class="pi pi-bookmark"></i> Notas</p>
           <p class="text-sm text-navy">{{ store.clienteActivo.notas }}</p>
         </div>
@@ -261,5 +421,75 @@ onMounted(() => {
         </div>
       </div>
     </Drawer>
+
+    <!-- Modal crear cliente -->
+    <Dialog
+      v-model:visible="crearModalVisible"
+      header="Nuevo Cliente"
+      modal
+      :style="{ width: '420px' }"
+      :pt="{
+        root: { class: 'border border-lavanda-medio rounded-xl' },
+        header: { class: 'bg-navy text-white rounded-t-xl p-4' },
+        title: { class: 'font-bold text-lg' },
+        content: { class: 'p-6' },
+        headerActions: { class: 'text-white' },
+      }"
+    >
+      <form @submit.prevent="guardarNuevoCliente" class="space-y-4">
+        <div>
+          <label class="block text-sm font-bold text-navy mb-1">Nombre *</label>
+          <input
+            v-model="crearForm.nombre"
+            type="text"
+            placeholder="María López"
+            class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-mauve transition"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-navy mb-1">WhatsApp *</label>
+          <input
+            v-model="crearForm.telefono"
+            type="text"
+            placeholder="0991234567"
+            class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-mauve transition"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-navy mb-1">Ciudad</label>
+          <input
+            v-model="crearForm.ciudad"
+            type="text"
+            placeholder="Quito, Guayaquil..."
+            class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-mauve transition"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-navy mb-1">Notas</label>
+          <textarea
+            v-model="crearForm.notas"
+            rows="2"
+            placeholder="Notas sobre el cliente..."
+            class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-mauve transition resize-none"
+          ></textarea>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            @click="crearModalVisible = false"
+            class="px-4 py-2 rounded-lg font-bold border border-lavanda-medio text-navy hover:bg-lavanda transition"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            :disabled="crearLoading"
+            class="px-6 py-2 rounded-lg font-bold bg-mauve text-white hover:opacity-90 transition shadow-sm disabled:opacity-50"
+          >
+            {{ crearLoading ? 'Guardando...' : 'Crear Cliente' }}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   </div>
 </template>

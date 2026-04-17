@@ -16,4 +16,8 @@ export class CreateClienteDto {
   @IsOptional()
   @IsString()
   notas?: string;
+
+  @IsOptional()
+  @IsString()
+  tienda_id?: string;
 }

@@ -17,13 +17,58 @@
    Estilos base
    ================================ */
 
+html {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #E6E6FB;
+  color: #030363;
 }
 
 #app {
   min-height: 100vh;
+}
+
+/* ================================
+   PrimeVue — Forzar light mode
+   ================================ */
+
+.p-dialog,
+.p-dialog-content,
+.p-drawer,
+.p-drawer-content,
+.p-popover,
+.p-select-overlay,
+.p-dropdown-panel {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #030363 !important;
+}
+
+.p-dialog-header {
+  background-color: var(--color-navy, #030363) !important;
+  color: #ffffff !important;
+}
+
+.p-dialog-close-button {
+  color: #ffffff !important;
+}
+
+.p-drawer .p-drawer-header {
+  background-color: var(--color-navy, #030363) !important;
+  color: #ffffff !important;
+}
+
+.p-drawer .p-drawer-close-button {
+  color: #ffffff !important;
+}
+
+/* SweetAlert2 — siempre por encima de todo */
+.swal2-container {
+  z-index: 99999 !important;
 }

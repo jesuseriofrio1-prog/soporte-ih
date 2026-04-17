@@ -8,6 +8,8 @@ export interface Cliente {
   ciudad: string | null
   notas: string | null
   created_at: string
+  pedidos_total: number
+  monto_total: number
 }
 
 export interface ClienteDetalle extends Cliente {
@@ -19,6 +21,7 @@ export interface CreateClientePayload {
   telefono: string
   ciudad?: string
   notas?: string
+  tienda_id?: string
 }
 
 export interface UpdateClientePayload {
@@ -29,8 +32,9 @@ export interface UpdateClientePayload {
 }
 
 const clientesService = {
-  async getAll(q?: string): Promise<Cliente[]> {
-    const params = q ? { q } : {}
+  async getAll(tiendaId: string, q?: string): Promise<Cliente[]> {
+    const params: Record<string, string> = { tienda_id: tiendaId }
+    if (q) params.q = q
     const { data } = await api.get('/clientes', { params })
     return data
   },
@@ -48,6 +52,10 @@ const clientesService = {
   async update(id: string, payload: UpdateClientePayload): Promise<Cliente> {
     const { data } = await api.patch(`/clientes/${id}`, payload)
     return data
+  },
+
+  async remove(id: string): Promise<void> {
+    await api.delete(`/clientes/${id}`)
   },
 }
 

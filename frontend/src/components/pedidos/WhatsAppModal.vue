@@ -66,13 +66,16 @@ function enviar() {
 
 /** Estilo del badge de estado en el resumen */
 const estadoEstilos: Record<string, string> = {
-  INGRESANDO: 'bg-gray-100 text-gray-700',
-  EN_TRANSITO: 'bg-blue-100 text-blue-700',
-  EN_AGENCIA: 'bg-purple-100 text-purple-700',
-  EN_REPARTO: 'bg-yellow-100 text-yellow-700',
-  ENTREGADO: 'bg-green-100 text-green-700',
+  PENDIENTE: 'bg-gray-100 text-gray-700',
+  CONFIRMADO: 'bg-blue-100 text-blue-700',
+  EN_PREPARACION: 'bg-indigo-100 text-indigo-700',
+  ENVIADO: 'bg-cyan-100 text-cyan-700',
+  EN_RUTA: 'bg-yellow-100 text-yellow-700',
   NOVEDAD: 'bg-orange-100 text-orange-700',
-  DEVUELTO: 'bg-red-100 text-red-700',
+  RETIRO_EN_AGENCIA: 'bg-purple-100 text-purple-700',
+  ENTREGADO: 'bg-green-100 text-green-700',
+  NO_ENTREGADO: 'bg-red-100 text-red-700',
+  DEVUELTO: 'bg-red-200 text-red-800',
 }
 </script>
 

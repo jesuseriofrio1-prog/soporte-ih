@@ -19,19 +19,38 @@ export interface CanalStat {
   total: number
 }
 
+export interface StorageInfo {
+  size_bytes: number
+  size_mb: number
+  limit_mb: number
+  usage_percent: number
+  records: {
+    productos: number
+    clientes: number
+    pedidos: number
+    historial: number
+    total: number
+  }
+}
+
 const dashboardService = {
-  async getStats(): Promise<DashboardStats> {
-    const { data } = await api.get('/dashboard/stats')
+  async getStats(tiendaId: string): Promise<DashboardStats> {
+    const { data } = await api.get(`/dashboard/stats?tienda_id=${tiendaId}`)
     return data
   },
 
-  async getVentasSemana(): Promise<VentaDia[]> {
-    const { data } = await api.get('/dashboard/ventas-semana')
+  async getVentasSemana(tiendaId: string): Promise<VentaDia[]> {
+    const { data } = await api.get(`/dashboard/ventas-semana?tienda_id=${tiendaId}`)
     return data
   },
 
-  async getCanalesStats(): Promise<CanalStat[]> {
-    const { data } = await api.get('/dashboard/canales')
+  async getCanalesStats(tiendaId: string): Promise<CanalStat[]> {
+    const { data } = await api.get(`/dashboard/canales?tienda_id=${tiendaId}`)
+    return data
+  },
+
+  async getStorageInfo(): Promise<StorageInfo> {
+    const { data } = await api.get('/dashboard/storage')
     return data
   },
 }

@@ -14,7 +14,12 @@ export class SupabaseService {
       throw new Error('Faltan las variables SUPABASE_URL o SUPABASE_SERVICE_KEY en .env');
     }
 
-    this.client = createClient(supabaseUrl, supabaseServiceKey);
+    this.client = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
   }
 
   /** Retorna el cliente de Supabase con permisos de service_role */

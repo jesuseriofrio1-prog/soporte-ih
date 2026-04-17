@@ -4,6 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { normalizarTelefono } from '../common/utils';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { UpdateClienteDto } from './dto/update-cliente.dto';
 
@@ -11,29 +12,22 @@ import { UpdateClienteDto } from './dto/update-cliente.dto';
 export class ClientesService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  /** Normalizar teléfono: quitar espacios/guiones, 0 inicial → 593 */
-  private normalizarTelefono(telefono: string): string {
-    let limpio = telefono.replace(/[\s\-]/g, '');
-    if (limpio.startsWith('0')) {
-      limpio = '593' + limpio.slice(1);
-    }
-    return limpio;
-  }
-
-  /** Listar clientes, con búsqueda opcional por nombre o teléfono */
-  async findAll(q?: string) {
+  /** Listar clientes con stats de pedidos, búsqueda opcional */
+  async findAll(tiendaId: string, q?: string, limit = 100, offset = 0) {
     let query = this.supabase
       .getClient()
-      .from('clientes')
-      .select('*');
+      .from('clientes_con_stats')
+      .select('*')
+      .eq('tienda_id', tiendaId);
 
     if (q) {
-      query = query.or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%`);
+      const sanitized = q.replace(/[%_]/g, '');
+      query = query.or(`nombre.ilike.%${sanitized}%,telefono.ilike.%${sanitized}%`);
     }
 
-    const { data, error } = await query.order('created_at', {
-      ascending: false,
-    });
+    const { data, error } = await query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
     return data;
@@ -52,28 +46,33 @@ export class ClientesService {
       throw new NotFoundException(`Cliente con id "${id}" no encontrado`);
     }
 
-    // Obtener pedidos del cliente con datos del producto
-    const { data: pedidos } = await this.supabase
+    const { data: pedidos, error: errPedidos } = await this.supabase
       .getClient()
       .from('pedidos')
       .select('*, productos(nombre, slug)')
       .eq('cliente_id', id)
       .order('created_at', { ascending: false });
 
+    if (errPedidos) throw errPedidos;
+
     return { ...cliente, pedidos: pedidos || [] };
   }
 
   /** Crear un cliente nuevo */
   async create(dto: CreateClienteDto) {
-    dto.telefono = this.normalizarTelefono(dto.telefono);
+    dto.telefono = normalizarTelefono(dto.telefono);
 
-    // Verificar si el teléfono ya existe
-    const { data: existente } = await this.supabase
+    const { data: existente, error: errBusca } = await this.supabase
       .getClient()
       .from('clientes')
       .select('*')
       .eq('telefono', dto.telefono)
+      .eq('tienda_id', dto.tienda_id)
       .single();
+
+    if (errBusca && errBusca.code !== 'PGRST116') {
+      throw errBusca;
+    }
 
     if (existente) {
       throw new ConflictException({
@@ -98,7 +97,7 @@ export class ClientesService {
     await this.findOne(id);
 
     if (dto.telefono) {
-      dto.telefono = this.normalizarTelefono(dto.telefono);
+      dto.telefono = normalizarTelefono(dto.telefono);
     }
 
     const { data, error } = await this.supabase
@@ -111,5 +110,25 @@ export class ClientesService {
 
     if (error) throw error;
     return data;
+  }
+
+  /** Eliminar un cliente */
+  async remove(id: string) {
+    await this.findOne(id);
+
+    const { error } = await this.supabase
+      .getClient()
+      .from('clientes')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      if (error.code === '23503') {
+        throw new ConflictException('No se puede eliminar: el cliente tiene pedidos asociados');
+      }
+      throw error;
+    }
+
+    return { message: 'Cliente eliminado' };
   }
 }

@@ -22,7 +22,8 @@ export class CreatePedidoDto {
   @IsNotEmpty({ message: 'El teléfono del cliente es requerido' })
   cliente_telefono: string;
 
-  @IsUUID('4', { message: 'producto_id debe ser un UUID válido' })
+  @IsString()
+  @IsNotEmpty({ message: 'producto_id es requerido' })
   producto_id: string;
 
   @IsString()
@@ -47,4 +48,8 @@ export class CreatePedidoDto {
   @IsOptional()
   @IsString()
   notas?: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'tienda_id es requerido' })
+  tienda_id: string;
 }

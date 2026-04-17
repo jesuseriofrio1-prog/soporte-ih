@@ -6,10 +6,10 @@ export class DashboardService {
   constructor(private readonly supabase: SupabaseService) {}
 
   /** Estadísticas generales del mes */
-  async getStats() {
+  async getStats(tiendaId: string) {
     const { data, error } = await this.supabase
       .getClient()
-      .rpc('get_dashboard_stats');
+      .rpc('get_dashboard_stats', { p_tienda_id: tiendaId });
 
     if (error) throw error;
 
@@ -29,22 +29,32 @@ export class DashboardService {
   }
 
   /** Ventas agrupadas por día (últimos 7 días) */
-  async getVentasSemana() {
+  async getVentasSemana(tiendaId: string) {
     const { data, error } = await this.supabase
       .getClient()
-      .rpc('get_ventas_semana');
+      .rpc('get_ventas_semana', { p_tienda_id: tiendaId });
 
     if (error) throw error;
     return data || [];
   }
 
   /** Distribución de pedidos por canal de origen (mes actual) */
-  async getCanalesStats() {
+  async getCanalesStats(tiendaId: string) {
     const { data, error } = await this.supabase
       .getClient()
-      .rpc('get_canales_stats');
+      .rpc('get_canales_stats', { p_tienda_id: tiendaId });
 
     if (error) throw error;
     return data || [];
+  }
+
+  /** Tamaño de la base de datos */
+  async getDbSize() {
+    const { data, error } = await this.supabase
+      .getClient()
+      .rpc('get_db_size');
+
+    if (error) throw error;
+    return data;
   }
 }

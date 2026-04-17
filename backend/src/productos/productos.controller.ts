@@ -18,10 +18,13 @@ export class ProductosController {
   constructor(private readonly productosService: ProductosService) {}
 
   @Get()
-  findAll(@Query('activo') activo?: string) {
+  findAll(
+    @Query('tienda_id') tienda_id: string,
+    @Query('activo') activo?: string,
+  ) {
     // Convertir query param string a boolean (default: true)
     const activoBool = activo === undefined ? true : activo === 'true';
-    return this.productosService.findAll(activoBool);
+    return this.productosService.findAll(tienda_id, activoBool);
   }
 
   @Get(':id')

@@ -23,19 +23,10 @@ const router = useRouter()
 const dashStore = useDashboardStore()
 const productosStore = useProductosStore()
 
-// Producto con menor stock
+// Producto con menor stock (solo si hay productos)
 const productoMenorStock = computed(() => {
   if (productosStore.productos.length === 0) return null
   return [...productosStore.productos].sort((a, b) => a.stock - b.stock)[0]
-})
-
-// Días estimados de stock
-const diasEstimados = computed(() => {
-  if (!productoMenorStock.value || !dashStore.stats) return 0
-  const pedidosMes = dashStore.stats.pedidos_mes || 1
-  const promedioDiario = pedidosMes / 30
-  if (promedioDiario === 0) return 99
-  return Math.round(productoMenorStock.value.stock / promedioDiario)
 })
 
 // Datos del chart
@@ -95,16 +86,9 @@ const chartOptions = {
 
 // Colores para canales
 const CANAL_COLORES = [
-  '#C49BC2', // mauve
-  '#030363', // navy
-  '#25D366', // wa-green
-  '#C8C8E9', // lavanda-medio
-  '#EF4444', // alerta
-  '#3B82F6', // blue
-  '#F59E0B', // amber
+  '#C49BC2', '#030363', '#25D366', '#C8C8E9', '#EF4444', '#3B82F6', '#F59E0B',
 ]
 
-// Datos del donut de canales
 const canalesChartData = computed(() => {
   const canales = dashStore.canalesStats
   return {
@@ -145,10 +129,16 @@ const canalesChartOptions = {
   },
 }
 
-// Formatear número a moneda
 function formatMoney(val: number): string {
   return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// Texto dinámico para tránsito
+const transitoTexto = computed(() => {
+  const n = dashStore.stats?.en_transito || 0
+  if (n === 0) return 'Sin envíos activos'
+  return `${n} envío${n > 1 ? 's' : ''} en curso`
+})
 
 onMounted(() => {
   dashStore.fetchAll()
@@ -172,16 +162,13 @@ onMounted(() => {
           <div class="absolute right-0 top-0 h-full w-2 bg-mauve"></div>
           <p class="text-sm font-bold uppercase text-navy/60 mb-1">Ventas Mes</p>
           <p class="text-3xl font-black text-navy">${{ formatMoney(dashStore.stats.ventas_mes) }}</p>
-          <p class="text-xs font-bold text-green-500 mt-2">
-            <i class="pi pi-arrow-up"></i> 12% vs mes anterior
-          </p>
         </div>
 
         <!-- Pedidos Mes -->
         <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
           <p class="text-sm font-bold uppercase text-navy/60 mb-1">Pedidos Mes</p>
           <p class="text-3xl font-black text-navy">{{ dashStore.stats.pedidos_mes }}</p>
-          <p class="text-xs font-bold text-navy/50 mt-2">
+          <p v-if="dashStore.stats.pedidos_mes > 0" class="text-xs font-bold text-navy/50 mt-2">
             Promedio: ${{ formatMoney(dashStore.stats.promedio_pedido) }} / pedido
           </p>
         </div>
@@ -191,20 +178,36 @@ onMounted(() => {
           <p class="text-sm font-bold uppercase text-navy/60 mb-1">En Tránsito / Agencia</p>
           <p class="text-3xl font-black text-navy">{{ dashStore.stats.en_transito }}</p>
           <p class="text-xs font-bold text-blue-500 mt-2">
-            <i class="pi pi-truck"></i> Operando normal
+            <i class="pi pi-truck" aria-hidden="true"></i> {{ transitoTexto }}
           </p>
         </div>
 
         <!-- Riesgo Devolución -->
-        <div class="bg-red-50 p-6 rounded-xl shadow-sm border border-red-200 relative overflow-hidden">
-          <div class="absolute right-0 top-0 h-full w-2 bg-alerta animate-pulse"></div>
-          <p class="text-sm font-bold uppercase text-alerta mb-1">Riesgo de Devolución</p>
-          <p class="text-3xl font-black text-red-600">{{ dashStore.stats.riesgo_devolucion }}</p>
+        <div
+          class="p-6 rounded-xl shadow-sm relative overflow-hidden"
+          :class="dashStore.stats.riesgo_devolucion > 0
+            ? 'bg-red-50 border border-red-200'
+            : 'bg-white border border-lavanda-medio'"
+        >
+          <div
+            v-if="dashStore.stats.riesgo_devolucion > 0"
+            class="absolute right-0 top-0 h-full w-2 bg-alerta animate-pulse"
+          ></div>
+          <p class="text-sm font-bold uppercase mb-1" :class="dashStore.stats.riesgo_devolucion > 0 ? 'text-alerta' : 'text-navy/60'">
+            Riesgo de Devolución
+          </p>
+          <p class="text-3xl font-black" :class="dashStore.stats.riesgo_devolucion > 0 ? 'text-red-600' : 'text-navy'">
+            {{ dashStore.stats.riesgo_devolucion }}
+          </p>
           <p
+            v-if="dashStore.stats.riesgo_devolucion > 0"
             class="text-xs font-bold text-red-600 mt-2 cursor-pointer hover:underline"
             @click="router.push('/pedidos')"
           >
-            <i class="pi pi-exclamation-circle"></i> Requieren atención hoy
+            <i class="pi pi-exclamation-circle" aria-hidden="true"></i> Requieren atención hoy
+          </p>
+          <p v-else class="text-xs font-bold text-green-500 mt-2">
+            <i class="pi pi-check-circle" aria-hidden="true"></i> Sin riesgos
           </p>
         </div>
       </div>
@@ -213,12 +216,7 @@ onMounted(() => {
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Chart ventas semana -->
         <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-navy">Tendencia de Ventas (Últimos 7 días)</h3>
-            <button class="text-xs bg-lavanda text-navy px-3 py-1 rounded font-bold hover:bg-lavanda-medio transition">
-              Descargar
-            </button>
-          </div>
+          <h3 class="text-lg font-bold text-navy mb-4">Tendencia de Ventas (Últimos 7 días)</h3>
           <div class="relative h-64 w-full">
             <Line
               v-if="dashStore.ventasSemana.length > 0"
@@ -231,39 +229,41 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Panel Insights -->
+        <!-- Panel Insights (solo si hay datos de inventario) -->
         <div class="bg-navy p-6 rounded-xl shadow-md text-white flex flex-col justify-between relative overflow-hidden">
-          <i class="pi pi-sparkles absolute top-4 right-4 text-mauve text-4xl opacity-20"></i>
+          <i class="pi pi-sparkles absolute top-4 right-4 text-mauve text-4xl opacity-20" aria-hidden="true"></i>
 
           <div>
             <h3 class="text-lg font-black text-mauve flex items-center gap-2 mb-4">
-              ✨ Insights
+              Resumen
             </h3>
 
             <div class="space-y-4">
               <!-- Alerta inventario -->
               <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
                 <p class="text-xs font-bold text-lavanda-medio mb-1">
-                  <i class="pi pi-box"></i> Alerta de Inventario
+                  <i class="pi pi-box" aria-hidden="true"></i> Inventario
                 </p>
                 <p v-if="productoMenorStock" class="text-sm font-medium">
-                  El <span class="italic">{{ productoMenorStock.nombre }}</span> tiene stock bajo.
-                  Quedan <span class="font-bold text-mauve">{{ productoMenorStock.stock }} uds</span>,
-                  suficiente para ~{{ diasEstimados }} días.
+                  <span class="italic">{{ productoMenorStock.nombre }}</span>:
+                  <span class="font-bold text-mauve">{{ productoMenorStock.stock }} uds</span> disponibles
                 </p>
                 <p v-else class="text-sm font-medium text-lavanda-medio">
-                  Sin datos de inventario
+                  Agrega productos en el Catálogo
                 </p>
               </div>
 
-              <!-- Optimización -->
+              <!-- Resumen de pedidos -->
               <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
                 <p class="text-xs font-bold text-lavanda-medio mb-1">
-                  <i class="pi pi-map-marker"></i> Optimización
+                  <i class="pi pi-chart-bar" aria-hidden="true"></i> Actividad
                 </p>
-                <p class="text-sm font-medium">
-                  Aumento de ventas en <span class="italic">Guayaquil</span>.
-                  Podrías lanzar una campaña Ads dirigida a esa zona.
+                <p v-if="dashStore.stats.pedidos_mes > 0" class="text-sm font-medium">
+                  {{ dashStore.stats.pedidos_mes }} pedidos este mes por
+                  <span class="font-bold text-mauve">${{ formatMoney(dashStore.stats.ventas_mes) }}</span>
+                </p>
+                <p v-else class="text-sm font-medium text-lavanda-medio">
+                  Sin pedidos este mes
                 </p>
               </div>
             </div>
@@ -271,7 +271,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Canales de origen -->
+      <!-- Canales de origen (solo si hay datos) -->
       <div v-if="dashStore.canalesStats.length > 0" class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
         <h3 class="text-lg font-bold text-navy mb-4">Pedidos por Canal de Origen</h3>
         <div class="flex flex-col md:flex-row items-center gap-6">

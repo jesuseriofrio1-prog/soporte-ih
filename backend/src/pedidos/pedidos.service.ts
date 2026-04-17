@@ -4,44 +4,40 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { normalizarTelefono } from '../common/utils';
 import { CreatePedidoDto } from './dto/create-pedido.dto';
 import { UpdatePedidoDto } from './dto/update-pedido.dto';
 import { CambiarEstadoDto, EstadoPedido } from './dto/cambiar-estado.dto';
 
-/** Mapa de transiciones válidas de estado */
-const TRANSICIONES_VALIDAS: Record<string, string[]> = {
-  INGRESANDO: ['EN_TRANSITO'],
-  EN_TRANSITO: ['EN_AGENCIA', 'EN_REPARTO', 'NOVEDAD'],
-  EN_AGENCIA: ['ENTREGADO', 'DEVUELTO', 'NOVEDAD'],
-  EN_REPARTO: ['ENTREGADO', 'NOVEDAD'],
-  NOVEDAD: ['EN_TRANSITO', 'EN_AGENCIA', 'EN_REPARTO', 'DEVUELTO', 'ENTREGADO'],
-};
+/** Todos los estados posibles */
+const TODOS_LOS_ESTADOS = [
+  'PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'ENVIADO',
+  'EN_RUTA', 'NOVEDAD', 'RETIRO_EN_AGENCIA',
+  'ENTREGADO', 'NO_ENTREGADO', 'DEVUELTO',
+];
 
 @Injectable()
 export class PedidosService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  /** Normalizar teléfono: quitar espacios/guiones, 0 inicial → 593 */
-  private normalizarTelefono(telefono: string): string {
-    let limpio = telefono.replace(/[\s\-]/g, '');
-    if (limpio.startsWith('0')) {
-      limpio = '593' + limpio.slice(1);
-    }
-    return limpio;
-  }
-
   /** Listar pedidos con filtros y joins */
   async findAll(filtros: {
+    tienda_id?: string;
     estado?: string;
     producto_id?: string;
     fecha_desde?: string;
     fecha_hasta?: string;
+    limit?: number;
+    offset?: number;
   }) {
     let query = this.supabase
       .getClient()
       .from('pedidos')
       .select('*, clientes(nombre, telefono), productos(nombre, slug)');
 
+    if (filtros.tienda_id) {
+      query = query.eq('tienda_id', filtros.tienda_id);
+    }
     if (filtros.estado) {
       query = query.eq('estado', filtros.estado);
     }
@@ -55,9 +51,12 @@ export class PedidosService {
       query = query.lte('created_at', filtros.fecha_hasta + 'T23:59:59');
     }
 
-    const { data, error } = await query.order('created_at', {
-      ascending: false,
-    });
+    const limit = filtros.limit || 100;
+    const offset = filtros.offset || 0;
+
+    const { data, error } = await query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
     return data;
@@ -76,25 +75,27 @@ export class PedidosService {
       throw new NotFoundException(`Pedido con id "${id}" no encontrado`);
     }
 
-    const { data: historial } = await this.supabase
+    const { data: historial, error: errHist } = await this.supabase
       .getClient()
       .from('historial_estados')
       .select('*')
       .eq('pedido_id', id)
       .order('created_at', { ascending: true });
 
+    if (errHist) throw errHist;
+
     return { ...pedido, historial: historial || [] };
   }
 
-  /** Crear pedido: busca/crea cliente, descuenta stock */
+  /** Crear pedido: busca/crea cliente, descuenta stock atómicamente */
   async create(dto: CreatePedidoDto) {
     const db = this.supabase.getClient();
-    const telefonoNorm = this.normalizarTelefono(dto.cliente_telefono);
+    const telefonoNorm = normalizarTelefono(dto.cliente_telefono);
 
-    // 1. Verificar que el producto existe y tiene stock
+    // 1. Verificar que el producto existe
     const { data: producto, error: errProd } = await db
       .from('productos')
-      .select('id, stock, activo')
+      .select('id, activo')
       .eq('id', dto.producto_id)
       .single();
 
@@ -104,25 +105,37 @@ export class PedidosService {
     if (!producto.activo) {
       throw new BadRequestException('El producto no está activo');
     }
-    if (producto.stock <= 0) {
+
+    // 2. Descontar stock atómicamente (evita race conditions)
+    const { data: stockOk, error: errStock } = await db.rpc('descontar_stock', {
+      p_producto_id: dto.producto_id,
+    });
+
+    if (errStock) throw errStock;
+    if (!stockOk) {
       throw new BadRequestException('El producto no tiene stock disponible');
     }
 
-    // 2. Buscar o crear cliente
+    // 3. Buscar o crear cliente
     let clienteId: string;
 
-    const { data: clienteExistente } = await db
+    const { data: clienteExistente, error: errBusca } = await db
       .from('clientes')
       .select('id')
       .eq('telefono', telefonoNorm)
+      .eq('tienda_id', dto.tienda_id)
       .single();
+
+    if (errBusca && errBusca.code !== 'PGRST116') {
+      throw new BadRequestException('Error al buscar cliente');
+    }
 
     if (clienteExistente) {
       clienteId = clienteExistente.id;
     } else {
       const { data: nuevoCliente, error: errCli } = await db
         .from('clientes')
-        .insert({ nombre: dto.cliente_nombre, telefono: telefonoNorm })
+        .insert({ nombre: dto.cliente_nombre, telefono: telefonoNorm, tienda_id: dto.tienda_id })
         .select('id')
         .single();
 
@@ -132,11 +145,13 @@ export class PedidosService {
       clienteId = nuevoCliente.id;
     }
 
-    // 3. Crear el pedido
+    // 4. Crear el pedido
     const { data: pedido, error: errPedido } = await db
       .from('pedidos')
       .insert({
         cliente_id: clienteId,
+        cliente_nombre: dto.cliente_nombre,
+        cliente_telefono: telefonoNorm,
         producto_id: dto.producto_id,
         guia: dto.guia,
         tipo_entrega: dto.tipo_entrega,
@@ -144,54 +159,117 @@ export class PedidosService {
         monto: dto.monto,
         canal_origen: dto.canal_origen || null,
         notas: dto.notas || null,
-        estado: 'INGRESANDO',
+        estado: 'PENDIENTE',
+        tienda_id: dto.tienda_id,
       })
       .select('*, clientes(nombre, telefono), productos(nombre, slug)')
       .single();
 
     if (errPedido) throw errPedido;
 
-    // 4. Descontar 1 del stock
-    await db
-      .from('productos')
-      .update({ stock: producto.stock - 1 })
-      .eq('id', dto.producto_id);
-
     // 5. Registrar en historial
-    await db.from('historial_estados').insert({
+    const { error: errHist } = await db.from('historial_estados').insert({
       pedido_id: pedido.id,
       estado_anterior: null,
-      estado_nuevo: 'INGRESANDO',
+      estado_nuevo: 'PENDIENTE',
       nota: 'Pedido creado',
     });
+
+    if (errHist) throw errHist;
 
     return pedido;
   }
 
-  /** Editar datos generales del pedido */
+  /** Editar datos del pedido */
   async update(id: string, dto: UpdatePedidoDto) {
+    const db = this.supabase.getClient();
     await this.findOne(id);
 
-    const { data, error } = await this.supabase
-      .getClient()
+    // Todos los campos se guardan directo en el pedido
+    const pedidoUpdate: Record<string, unknown> = {};
+    if (dto.cliente_nombre !== undefined) pedidoUpdate.cliente_nombre = dto.cliente_nombre;
+    if (dto.cliente_telefono !== undefined) {
+      pedidoUpdate.cliente_telefono = normalizarTelefono(dto.cliente_telefono);
+    }
+    if (dto.direccion !== undefined) pedidoUpdate.direccion = dto.direccion;
+    if (dto.notas !== undefined) pedidoUpdate.notas = dto.notas;
+    if (dto.dias_en_agencia !== undefined) pedidoUpdate.dias_en_agencia = dto.dias_en_agencia;
+    if (dto.guia !== undefined) pedidoUpdate.guia = dto.guia;
+    if (dto.monto !== undefined) pedidoUpdate.monto = dto.monto;
+
+    if (Object.keys(pedidoUpdate).length > 0) {
+      const { error } = await db
+        .from('pedidos')
+        .update(pedidoUpdate)
+        .eq('id', id);
+
+      if (error) throw error;
+    }
+
+    // Retornar pedido actualizado con joins
+    return this.findOne(id);
+  }
+
+  /** Activar/desactivar conteo de retención de 8 días */
+  async toggleRetencion(id: string) {
+    const db = this.supabase.getClient();
+
+    const { data: pedido, error } = await db
       .from('pedidos')
-      .update(dto)
+      .select('id, retencion_inicio')
+      .eq('id', id)
+      .single();
+
+    if (error || !pedido) {
+      throw new NotFoundException(`Pedido con id "${id}" no encontrado`);
+    }
+
+    // Toggle: si ya tiene fecha la quita, si no la pone
+    const nuevoValor = pedido.retencion_inicio ? null : new Date().toISOString();
+
+    const { data, error: errUp } = await db
+      .from('pedidos')
+      .update({ retencion_inicio: nuevoValor })
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (errUp) throw errUp;
     return data;
+  }
+
+  /** Eliminar pedido y su historial */
+  async remove(id: string) {
+    const db = this.supabase.getClient();
+
+    // Verificar que existe
+    const { data: pedido, error } = await db
+      .from('pedidos')
+      .select('id, producto_id')
+      .eq('id', id)
+      .single();
+
+    if (error || !pedido) {
+      throw new NotFoundException(`Pedido con id "${id}" no encontrado`);
+    }
+
+    // Eliminar historial primero (FK cascade lo haría pero lo hacemos explícito)
+    await db.from('historial_estados').delete().eq('pedido_id', id);
+
+    // Eliminar pedido
+    const { error: errDel } = await db.from('pedidos').delete().eq('id', id);
+    if (errDel) throw errDel;
+
+    return { message: 'Pedido eliminado' };
   }
 
   /** Cambiar estado del pedido con validación de transiciones */
   async cambiarEstado(id: string, dto: CambiarEstadoDto) {
     const db = this.supabase.getClient();
 
-    // Obtener pedido actual
     const { data: pedido, error } = await db
       .from('pedidos')
-      .select('*, productos(id, stock)')
+      .select('*, productos(id)')
       .eq('id', id)
       .single();
 
@@ -202,16 +280,16 @@ export class PedidosService {
     const estadoActual = pedido.estado as string;
     const nuevoEstado = dto.nuevo_estado;
 
-    // Validar transición
-    const permitidas = TRANSICIONES_VALIDAS[estadoActual];
-    if (!permitidas || !permitidas.includes(nuevoEstado)) {
-      throw new BadRequestException(
-        `Transición inválida: ${estadoActual} → ${nuevoEstado}. ` +
-        `Transiciones permitidas desde ${estadoActual}: ${(permitidas || []).join(', ') || 'ninguna (estado final)'}`,
-      );
+    // Validar que sea un estado válido
+    if (!TODOS_LOS_ESTADOS.includes(nuevoEstado)) {
+      throw new BadRequestException(`Estado "${nuevoEstado}" no es válido`);
     }
 
-    // Actualizar estado del pedido
+    // No permitir cambiar al mismo estado
+    if (estadoActual === nuevoEstado) {
+      throw new BadRequestException(`El pedido ya está en estado ${nuevoEstado}`);
+    }
+
     const { data: pedidoActualizado, error: errUpdate } = await db
       .from('pedidos')
       .update({ estado: nuevoEstado })
@@ -221,20 +299,21 @@ export class PedidosService {
 
     if (errUpdate) throw errUpdate;
 
-    // Registrar en historial
-    await db.from('historial_estados').insert({
+    const { error: errHist } = await db.from('historial_estados').insert({
       pedido_id: id,
       estado_anterior: estadoActual,
       estado_nuevo: nuevoEstado,
       nota: dto.nota || null,
     });
 
-    // Si es DEVUELTO → devolver 1 al stock
+    if (errHist) throw errHist;
+
+    // Si es DEVUELTO → devolver stock atómicamente
     if (nuevoEstado === EstadoPedido.DEVUELTO && pedido.productos) {
-      await db
-        .from('productos')
-        .update({ stock: pedido.productos.stock + 1 })
-        .eq('id', pedido.productos.id);
+      const { error: errDev } = await db.rpc('devolver_stock', {
+        p_producto_id: pedido.productos.id,
+      });
+      if (errDev) throw errDev;
     }
 
     return pedidoActualizado;

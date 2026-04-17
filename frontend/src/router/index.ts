@@ -2,12 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
-    path: '/login',
-    name: 'login',
-    component: () => import('../views/LoginView.vue'),
-    meta: { public: true },
-  },
-  {
     path: '/',
     redirect: '/dashboard',
   },
@@ -39,6 +33,12 @@ const routes = [
         component: () => import('../views/ClientesView.vue'),
         meta: { title: 'Clientes' },
       },
+      {
+        path: 'tiendas',
+        name: 'tiendas',
+        component: () => import('../views/TiendasView.vue'),
+        meta: { title: 'Administrar Tiendas' },
+      },
     ],
   },
 ]
@@ -46,19 +46,6 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-})
-
-// Navigation guard: proteger rutas si no hay token
-router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('skinna_token')
-
-  if (!to.meta.public && !token) {
-    next('/login')
-  } else if (to.path === '/login' && token) {
-    next('/dashboard')
-  } else {
-    next()
-  }
 })
 
 export default router

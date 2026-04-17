@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsInt,
   IsOptional,
+  IsUUID,
   Matches,
   Min,
 } from 'class-validator';
@@ -31,4 +32,8 @@ export class CreateProductoDto {
   @IsOptional()
   @IsString()
   icono?: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'tienda_id es requerido' })
+  tienda_id: string;
 }

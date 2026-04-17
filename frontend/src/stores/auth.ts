@@ -24,8 +24,21 @@ export const useAuthStore = defineStore('auth', () => {
     userEmail.value = null
     localStorage.removeItem('skinna_token')
     localStorage.removeItem('skinna_user_email')
+    localStorage.removeItem('skinna_fcm_registered')
     router.push('/login')
   }
 
-  return { token, userEmail, isAuthenticated, login, logout }
+  /** Verifica que el token guardado siga siendo válido */
+  async function checkToken() {
+    if (!token.value) return false
+    try {
+      await api.get('/dashboard/stats')
+      return true
+    } catch {
+      logout()
+      return false
+    }
+  }
+
+  return { token, userEmail, isAuthenticated, login, logout, checkToken }
 })

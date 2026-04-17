@@ -23,8 +23,19 @@ async function handleLogin() {
     await authStore.login(email.value, password.value)
     toast.success('Bienvenido a SKINNA')
     router.push('/dashboard')
-  } catch {
-    toast.error('Credenciales inválidas')
+  } catch (e: unknown) {
+    const err = e as { response?: { status?: number }; request?: unknown }
+    if (!err.response && !err.request) {
+      toast.error('Error de conexión. Verifica tu internet.')
+    } else if (!err.response) {
+      toast.error('No se pudo conectar con el servidor')
+    } else if (err.response.status === 401) {
+      toast.error('Email o contraseña incorrectos')
+    } else if (err.response.status === 429) {
+      toast.error('Demasiados intentos. Espera un momento.')
+    } else {
+      toast.error('Error del servidor. Intenta más tarde.')
+    }
   } finally {
     loading.value = false
   }

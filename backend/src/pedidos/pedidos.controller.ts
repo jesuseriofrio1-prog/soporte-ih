@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -19,16 +20,22 @@ export class PedidosController {
 
   @Get()
   findAll(
+    @Query('tienda_id') tienda_id: string,
     @Query('estado') estado?: string,
     @Query('producto_id') producto_id?: string,
     @Query('fecha_desde') fecha_desde?: string,
     @Query('fecha_hasta') fecha_hasta?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
     return this.pedidosService.findAll({
+      tienda_id,
       estado,
       producto_id,
       fecha_desde,
       fecha_hasta,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
     });
   }
 
@@ -48,6 +55,16 @@ export class PedidosController {
     @Body() dto: UpdatePedidoDto,
   ) {
     return this.pedidosService.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.pedidosService.remove(id);
+  }
+
+  @Patch(':id/retencion')
+  toggleRetencion(@Param('id', ParseUUIDPipe) id: string) {
+    return this.pedidosService.toggleRetencion(id);
   }
 
   @Patch(':id/estado')

@@ -1,15 +1,15 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
 
 @Injectable()
 export class FirebaseAdminService implements OnModuleInit {
-  private app: admin.app.App;
+  private app: admin.app.App | null = null;
+  private readonly logger = new Logger(FirebaseAdminService.name);
 
   constructor(private configService: ConfigService) {}
 
   onModuleInit() {
-    // Evitar inicializar múltiples veces
     if (admin.apps.length > 0) {
       this.app = admin.apps[0]!;
       return;
@@ -19,47 +19,46 @@ export class FirebaseAdminService implements OnModuleInit {
       'FIREBASE_SERVICE_ACCOUNT_JSON',
     );
 
-    if (serviceAccountJson) {
-      // Desde variable de entorno (JSON string)
+    if (!serviceAccountJson) {
+      this.logger.warn('FIREBASE_SERVICE_ACCOUNT_JSON no configurado — push notifications deshabilitadas');
+      return;
+    }
+
+    try {
       const serviceAccount = JSON.parse(serviceAccountJson);
       this.app = admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
-    } else {
-      // Fallback: Google Application Default Credentials
-      this.app = admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-      });
+      this.logger.log('Firebase Admin inicializado correctamente');
+    } catch (error) {
+      this.logger.error('Error al inicializar Firebase Admin:', error);
     }
   }
 
-  /** Enviar notificación push a un token específico */
-  async sendToToken(
-    token: string,
-    title: string,
-    body: string,
-  ): Promise<string> {
+  private isReady(): boolean {
+    return this.app !== null;
+  }
+
+  async sendToToken(token: string, title: string, body: string): Promise<string | null> {
+    if (!this.isReady()) return null;
+
     const message: admin.messaging.Message = {
       token,
       notification: { title, body },
       webpush: {
-        notification: {
-          icon: '/favicon.ico',
-          badge: '/favicon.ico',
-        },
+        notification: { icon: '/favicon.ico', badge: '/favicon.ico' },
       },
     };
 
-    return this.app.messaging().send(message);
+    return this.app!.messaging().send(message);
   }
 
-  /** Enviar notificación push a múltiples tokens */
   async sendToMultiple(
     tokens: string[],
     title: string,
     body: string,
   ): Promise<{ success: number; failure: number }> {
-    if (tokens.length === 0) {
+    if (!this.isReady() || tokens.length === 0) {
       return { success: 0, failure: 0 };
     }
 
@@ -67,14 +66,11 @@ export class FirebaseAdminService implements OnModuleInit {
       tokens,
       notification: { title, body },
       webpush: {
-        notification: {
-          icon: '/favicon.ico',
-          badge: '/favicon.ico',
-        },
+        notification: { icon: '/favicon.ico', badge: '/favicon.ico' },
       },
     };
 
-    const response = await this.app.messaging().sendEachForMulticast(message);
+    const response = await this.app!.messaging().sendEachForMulticast(message);
     return {
       success: response.successCount,
       failure: response.failureCount,

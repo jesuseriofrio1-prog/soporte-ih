@@ -34,14 +34,20 @@ export class NotificationsService {
   }
 
   /** Revisa pedidos en riesgo y envía push notification */
-  async checkAlertas() {
+  async checkAlertas(tienda_id?: string) {
     // Buscar pedidos en riesgo de devolución
-    const { data: pedidosRiesgo, error } = await this.supabase
+    let query = this.supabase
       .getClient()
       .from('pedidos')
       .select('id')
-      .eq('estado', 'EN_AGENCIA')
+      .eq('estado', 'RETIRO_EN_AGENCIA')
       .gte('dias_en_agencia', 6);
+
+    if (tienda_id) {
+      query = query.eq('tienda_id', tienda_id);
+    }
+
+    const { data: pedidosRiesgo, error } = await query;
 
     if (error) throw error;
 

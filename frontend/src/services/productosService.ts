@@ -18,6 +18,7 @@ export interface CreateProductoPayload {
   precio: number
   stock: number
   icono?: string
+  tienda_id?: string
 }
 
 export interface UpdateProductoPayload {
@@ -29,8 +30,9 @@ export interface UpdateProductoPayload {
 }
 
 const productosService = {
-  async getAll(activo?: boolean): Promise<Producto[]> {
-    const params = activo !== undefined ? { activo } : {}
+  async getAll(tiendaId: string, activo?: boolean): Promise<Producto[]> {
+    const params: Record<string, unknown> = { tienda_id: tiendaId }
+    if (activo !== undefined) params.activo = activo
     const { data } = await api.get('/productos', { params })
     return data
   },

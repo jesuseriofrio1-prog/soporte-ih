@@ -5,6 +5,7 @@ import dashboardService, {
   type VentaDia,
   type CanalStat,
 } from '../services/dashboardService'
+import { useTiendaStore } from './tienda'
 
 export const useDashboardStore = defineStore('dashboard', () => {
   const stats = ref<DashboardStats | null>(null)
@@ -14,19 +15,24 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const error = ref<string | null>(null)
 
   async function fetchAll() {
+    const tiendaStore = useTiendaStore()
+    const tiendaId = tiendaStore.tiendaActiva?.id
+    if (!tiendaId) return
+
     loading.value = true
     error.value = null
     try {
       const [s, v, c] = await Promise.all([
-        dashboardService.getStats(),
-        dashboardService.getVentasSemana(),
-        dashboardService.getCanalesStats(),
+        dashboardService.getStats(tiendaId),
+        dashboardService.getVentasSemana(tiendaId),
+        dashboardService.getCanalesStats(tiendaId),
       ])
       stats.value = s
       ventasSemana.value = v
       canalesStats.value = c
-    } catch (e: any) {
-      error.value = e.response?.data?.message || 'Error al cargar dashboard'
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      error.value = err.response?.data?.message || 'Error al cargar dashboard'
     } finally {
       loading.value = false
     }
