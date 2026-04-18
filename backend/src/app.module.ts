@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TiendasModule } from './tiendas/tiendas.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { ImportsModule } from './imports/imports.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { TrackingModule } from './tracking/tracking.module';
     NotificationsModule,
     TiendasModule,
     TrackingModule,
+    ImportsModule,
   ],
   controllers: [AppController],
   providers: [],

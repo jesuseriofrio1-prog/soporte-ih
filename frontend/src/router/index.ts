@@ -44,6 +44,12 @@ const routes = [
         component: () => import('../views/TiendasView.vue'),
         meta: { title: 'Administrar Tiendas' },
       },
+      {
+        path: 'integraciones',
+        name: 'integraciones',
+        component: () => import('../views/IntegracionesView.vue'),
+        meta: { title: 'Integraciones' },
+      },
     ],
   },
 ]
