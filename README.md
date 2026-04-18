@@ -1,6 +1,6 @@
 # Soporte IH
 
-Plataforma multi-tienda de gestión de pedidos para marcas de dropshipping en Ecuador. Integra con **Rocket Ecuador** (import de Excel + webhook de estados + matching de productos con IA) y expone un **formulario público por producto** que tus clientes finales llenan y que se auto-enlaza con el pedido que creas en Rocket.
+Plataforma multi-tienda de gestión de pedidos para marcas de dropshipping en Ecuador. Integra con **Rocket Ecuador** (import de Excel + webhook de estados + matching de productos con IA) y expone un **formulario público por producto** (`/p/:tiendaSlug/:productoSlug`) que tus clientes finales llenan y que se auto-enlaza con el pedido que creas en Rocket. Incluye tracking público de guías, bandeja de upsell por novedades, unit economics por producto, bundles cosméticos y sistema de referidos con atribución por link.
 
 **Producción**: https://soporteih.vercel.app
 
@@ -17,13 +17,17 @@ soporte-ih/
 │   │   ├── clientes/       # CRM básico
 │   │   ├── pedidos/        # Core: estados, historial, retención
 │   │   ├── dashboard/      # KPIs, series, canales, storage
-│   │   ├── tracking/       # Scraping de Servientrega
+│   │   ├── tracking/       # Scraping de Servientrega (admin)
+│   │   ├── tracking-publico/ # /t/:code — tracking con marca para el cliente final
 │   │   ├── notifications/  # FCM push (opcional)
 │   │   ├── imports/        # Rocket: parser Excel + matcher IA (Claude Haiku)
 │   │   ├── webhooks/       # Rocket: receiver de cambios de estado
+│   │   ├── templates/      # Plantillas de WhatsApp por tienda
+│   │   ├── direcciones/    # Parser de direcciones desde WhatsApp
+│   │   ├── referidos/      # Códigos de referido + atribución
 │   │   └── solicitudes/    # Formulario público de pedidos + auto-enlace
 │   └── supabase/migrations/
-├── frontend/      # Vue 3 + Vite + PrimeVue + Tailwind
+├── frontend/      # Vue 3 + Vite + Tailwind + design system v2
 └── vercel.json    # Monorepo: un solo deploy para todo
 ```
 
@@ -31,7 +35,7 @@ soporte-ih/
 
 | Capa | Tecnología |
 |------|-----------|
-| Frontend | Vue 3, TypeScript, Vite, PrimeVue, TailwindCSS, Pinia, vue-router |
+| Frontend | Vue 3, TypeScript, Vite, TailwindCSS, Pinia, vue-router |
 | Backend | NestJS 11, TypeScript, Express adapter (serverless) |
 | BD | Supabase (PostgreSQL 17, RLS, RPCs) |
 | IA | Anthropic SDK + `claude-haiku-4-5` (matching de productos) |
@@ -101,6 +105,14 @@ Migraciones en `backend/supabase/migrations/` (aplicadas contra el proyecto Supa
 | 015 | `015_rocket_import.sql` | `external_source`, `external_order_id`, `cantidad` + tabla `producto_aliases` |
 | 016 | `016_provincia_y_webhook_logs.sql` | Columna `provincia` en clientes/pedidos + tabla `webhook_logs` |
 | 017 | `017_solicitudes.sql` | `tiendas.slug` + tabla `solicitudes` (formulario público) |
+| 018 | `018_webhook_logs_tienda.sql` | `tienda_id` en `webhook_logs` para filtrar por tienda |
+| 019 | `019_fcm_tokens_tienda.sql` | `tienda_id` en `fcm_tokens` (push segmentado) |
+| 020 | `020_whatsapp_templates.sql` | Tabla `whatsapp_templates` (plantillas por tienda) |
+| 021 | `021_tracking_code.sql` | `tracking_code` en `pedidos` para `/t/:code` público |
+| 022 | `022_productos_unit_economics.sql` | `costo_unitario` / `fee_envio` en `productos` |
+| 023 | `023_productos_bundles.sql` | `es_bundle` / `bundle_upgrade_desde` (upgrade cosmético) |
+| 024 | `024_referidos.sql` | Tabla `referidos` + `referido_codigo` en `solicitudes`/`pedidos` |
+| 025 | `025_productos_foto.sql` | `foto_url` en `productos` + bucket `producto-fotos` |
 
 ## API — endpoints
 
@@ -131,34 +143,39 @@ Todos bajo `/api`, con validación vía `class-validator` y `ValidationPipe` glo
 
 ### Formulario público + solicitudes
 
-Los endpoints `/public/*` son `@Public()` (sin JWT) y rate-limited (5 POST/min por IP, 60 GET/min).
+Los endpoints `/public/*` son `@Public()` (sin JWT) y rate-limited (5 POST/min por IP, 60 GET/min). **El link de compra siempre es por producto** (`/p/:tiendaSlug/:productoSlug`) — el link genérico de catálogo fue removido para simplificar atribución y evitar pedidos sin producto.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/public/tiendas/:slug` | Tienda pública (branding + catálogo) |
-| GET | `/public/tiendas/:slug/productos/:productoSlug` | Tienda + producto individual |
-| POST | `/public/tiendas/:slug/solicitudes[?producto=slug]` | Crea una **solicitud** (no un pedido) |
-| GET | `/solicitudes?tienda_id=…&estado=…` | Bandeja del admin |
-| GET | `/solicitudes/stats?tienda_id=…` | Contadores para el badge del sidebar |
-| PATCH | `/solicitudes/:id/vincular-rocket` | Pega el `rocket_order_id` — si el pedido ya existe, se enlaza inmediato |
-| PATCH | `/solicitudes/:id/estado` | Cambiar entre `PENDIENTE`, `ENVIADA_A_ROCKET`, `ENLAZADA`, `CANCELADA` |
-| DELETE | `/solicitudes/:id` | Eliminar |
+| GET | `/public/tiendas/:slug/productos/:productoSlug` | Tienda + producto individual (form público) |
+| POST | `/public/tiendas/:slug/solicitudes?producto=slug` | Crea una **solicitud** (no un pedido) |
+| GET | `/public/tracking/:code` | Tracking público con marca (route `/t/:code`) |
+| POST | `/referidos` · GET `/referidos?tienda_id=…` | Gestión de códigos de referido |
+| GET | `/public/referidos/validar?tienda_id=…&codigo=…` | Validar código en el form público |
+
+### Tracking público
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/t/:tracking_code` | Página pública con estado, hitos y marca de la tienda. `tracking_code` se genera por pedido en la migración 021 |
 
 ## Flujo de negocio
 
 ```
 Cliente final          Tú (admin)              Rocket Ecuador         Soporte IH
 ─────────────          ──────────             ───────────────         ──────────
-Ve anuncio ─────────► Le manda link          
+Ve anuncio ─────────► Le manda link
                       /p/skinna/<producto>
+                      (opcional ?ref=CODIGO)
 Llena form      ─────────────────────────────────────────────────►   crea Solicitud (PENDIENTE)
-                      Abre bandeja /solicitudes
-                      "Copiar todo" ────► Pega en Rocket
-                                           Rocket genera ID ─────►   
-                      Pega ID en solicitud ──────────────────────►   ENVIADA_A_ROCKET
-                                           Webhook / Excel  ──────►  crea Pedido (external_order_id)
+                                                                     + registra uso de referido (si vino ?ref=)
+                      Copia datos ────► Pega en Rocket
+                                         Rocket genera ID ─────►
+                                         Webhook / Excel  ──────►    crea Pedido (external_order_id)
                                                                      ↓ auto-enlace por rocket_order_id
                                                                      Solicitud → ENLAZADA (pedido_id)
+                                                                     ↓
+Recibe link /t/<code>  ◄──────────── Tracking público con marca ◄──── tracking_code del pedido
 ```
 
 **Garantía anti-duplicados**: el pedido real sólo se crea desde Rocket (webhook/Excel). El formulario sólo crea *Solicitudes*. El enlace es bidireccional vía `rocket_order_id`.
@@ -197,6 +214,8 @@ Rutas marcadas `@Public()` (sin token):
 - `POST /webhooks/rocket/:secret` (secret comparado en tiempo constante)
 - `GET /public/tiendas/:slug[/productos/:productoSlug]` (catálogo y form)
 - `POST /public/tiendas/:slug/solicitudes`
+- `GET /public/tracking/:code` (página `/t/:code`)
+- `GET /public/referidos/validar`
 
 El frontend:
 - `services/api.ts` con `withCredentials: true` + interceptor que añade

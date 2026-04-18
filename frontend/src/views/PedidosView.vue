@@ -281,6 +281,13 @@ async function generarReferido(pedido: Pedido) {
     toast.warning('El pedido no tiene nombre de cliente para generar el referido')
     return
   }
+  // El link ahora siempre es por producto — el general fue removido. Usamos
+  // el producto del pedido del que nace el referido.
+  const productoSlug = pedido.productos?.slug
+  if (!productoSlug) {
+    toast.warning('El pedido no tiene producto asociado, no se puede generar link de referido')
+    return
+  }
   try {
     const ref = await referidosService.create({
       tienda_id: tiendaStore.tiendaActiva.id,
@@ -290,7 +297,7 @@ async function generarReferido(pedido: Pedido) {
     })
     const tienda = tiendaStore.tiendaActiva.nombre
     const slug = tiendaStore.tiendaActiva.slug
-    const link = `${window.location.origin}/p/${slug}?ref=${encodeURIComponent(ref.codigo)}`
+    const link = `${window.location.origin}/p/${slug}/${productoSlug}?ref=${encodeURIComponent(ref.codigo)}`
     const mensaje = `¡Hola ${nombre}! 🎁\n\nTe comparto tu código personal de referido en ${tienda}:\n\nCódigo: *${ref.codigo}*\nLink directo: ${link}\n\nCuando alguien use tu link para pedir, te aviso y te mando un descuento especial por recomendar. ¡Gracias! ✨`
     await navigator.clipboard.writeText(mensaje)
     toast.success(`Código ${ref.codigo} creado y mensaje copiado al portapapeles`)

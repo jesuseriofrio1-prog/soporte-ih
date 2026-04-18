@@ -3,12 +3,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useToast } from 'vue-toastification'
 import { useTiendaStore } from '../stores/tienda'
 import referidosService, { type Referido } from '../services/referidosService'
+import productosService, { type Producto } from '../services/productosService'
 
 const toast = useToast()
 const tiendaStore = useTiendaStore()
 
 const referidos = ref<Referido[]>([])
+const productos = ref<Producto[]>([])
 const loading = ref(false)
+
+// Producto elegido para compartir el link (por referido). El link de compra
+// siempre es por producto — acá el admin elige cuál promover al referente.
+const productoParaLink = ref<Record<string, string>>({})
 
 // Modal crear
 const modalVisible = ref(false)
@@ -23,7 +29,19 @@ async function cargar() {
   if (!tiendaStore.tiendaActiva) return
   loading.value = true
   try {
-    referidos.value = await referidosService.list(tiendaStore.tiendaActiva.id)
+    const [refs, prods] = await Promise.all([
+      referidosService.list(tiendaStore.tiendaActiva.id),
+      productosService.getAll(tiendaStore.tiendaActiva.id, true),
+    ])
+    referidos.value = refs
+    productos.value = prods.filter((p) => !p.es_bundle)
+    // Default: primer producto activo de la tienda
+    const primero = productos.value[0]?.slug
+    if (primero) {
+      for (const r of refs) {
+        if (!productoParaLink.value[r.id]) productoParaLink.value[r.id] = primero
+      }
+    }
   } catch {
     toast.error('No se pudieron cargar los referidos')
   } finally {
@@ -54,6 +72,9 @@ async function crear() {
       notas: form.value.notas.trim() || undefined,
     })
     referidos.value.unshift(nuevo)
+    // Default: primer producto activo como producto del link
+    const primero = productos.value[0]?.slug
+    if (primero) productoParaLink.value[nuevo.id] = primero
     toast.success(`Código ${nuevo.codigo} creado`)
     modalVisible.value = false
   } catch (e: unknown) {
@@ -87,11 +108,13 @@ async function eliminar(r: Referido) {
   }
 }
 
-// Link + mensaje template para compartir
+// Link + mensaje template para compartir. El link es SIEMPRE por producto:
+// el admin elige cuál promover en el selector de la fila.
 function linkDe(r: Referido): string {
   const slug = tiendaStore.tiendaActiva?.slug
-  if (!slug) return ''
-  return `${window.location.origin}/p/${slug}?ref=${encodeURIComponent(r.codigo)}`
+  const productoSlug = productoParaLink.value[r.id]
+  if (!slug || !productoSlug) return ''
+  return `${window.location.origin}/p/${slug}/${productoSlug}?ref=${encodeURIComponent(r.codigo)}`
 }
 
 function mensajeWA(r: Referido): string {
@@ -193,6 +216,7 @@ function fmtFechaCorta(iso: string | null): string {
             <th class="py-2.5 px-2 text-right">Usos</th>
             <th class="py-2.5 px-2 text-right">Último uso</th>
             <th class="py-2.5 px-2 text-left">Creado</th>
+            <th class="py-2.5 px-2 text-left">Producto del link</th>
             <th class="py-2.5 pl-2 pr-5 text-right w-56">Acciones</th>
           </tr>
         </thead>
@@ -224,11 +248,22 @@ function fmtFechaCorta(iso: string | null): string {
             <td class="py-3 px-2 text-[11px] tabular font-mono text-ink-faint">
               {{ fmtFecha(r.created_at) }}
             </td>
+            <td class="py-3 px-2">
+              <select
+                v-model="productoParaLink[r.id]"
+                class="w-full max-w-[180px] px-2 py-1 border hairline rounded-md bg-paper-alt text-[12px] text-ink focus:outline-none focus:border-accent transition"
+                :disabled="productos.length === 0"
+              >
+                <option v-if="productos.length === 0" value="">Sin productos</option>
+                <option v-for="p in productos" :key="p.id" :value="p.slug">{{ p.nombre }}</option>
+              </select>
+            </td>
             <td class="py-3 pl-2 pr-5 text-right">
               <div class="flex items-center justify-end gap-1 flex-wrap">
                 <button
                   @click="copiar(linkDe(r), 'Link')"
-                  class="h-7 px-2 rounded-md text-[11px] font-medium hover:bg-paper-alt transition"
+                  :disabled="!linkDe(r)"
+                  class="h-7 px-2 rounded-md text-[11px] font-medium hover:bg-paper-alt transition disabled:opacity-40 disabled:hover:bg-transparent"
                   style="color: var(--accent);"
                   title="Copiar link del referido"
                 >
@@ -236,7 +271,8 @@ function fmtFechaCorta(iso: string | null): string {
                 </button>
                 <button
                   @click="copiar(mensajeWA(r), 'Mensaje')"
-                  class="h-7 px-2 rounded-md text-[11px] font-medium hover:bg-paper-alt transition"
+                  :disabled="!linkDe(r)"
+                  class="h-7 px-2 rounded-md text-[11px] font-medium hover:bg-paper-alt transition disabled:opacity-40 disabled:hover:bg-transparent"
                   style="color: var(--accent);"
                   title="Copiar mensaje completo para WhatsApp"
                 >

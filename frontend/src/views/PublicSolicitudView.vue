@@ -59,19 +59,26 @@ onMounted(async () => {
   }
 
   try {
-    if (productoSlug.value) {
-      const { tienda: t, producto: p } = await solicitudesService.productoPublico(
-        tiendaSlug.value,
-        productoSlug.value,
-      )
-      tienda.value = t
-      producto.value = p
-    } else {
-      const { tienda: t, catalogo: c } = await solicitudesService.tiendaPublica(tiendaSlug.value)
-      tienda.value = t
+    // El formulario público siempre exige producto (el link genérico de
+    // catálogo fue removido). Si alguien llega sin productoSlug, la ruta
+    // del router ya rechaza — acá asumimos que viene.
+    const { tienda: t, producto: p } = await solicitudesService.productoPublico(
+      tiendaSlug.value,
+      productoSlug.value,
+    )
+    tienda.value = t
+    producto.value = p
+
+    // Cargamos el catálogo completo SOLO para que bundleSugerido pueda
+    // encontrar upgrades asociados al producto elegido. No se muestra
+    // dropdown de productos al cliente.
+    try {
+      const { catalogo: c } = await solicitudesService.tiendaPublica(tiendaSlug.value)
       catalogo.value = c
-      if (c.length === 1) form.value.producto_id = c[0].id
+    } catch {
+      catalogo.value = [p]
     }
+
     aplicarColores()
   } catch (e: unknown) {
     const err = e as { response?: { status?: number } }

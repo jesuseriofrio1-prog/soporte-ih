@@ -10,7 +10,6 @@ import { usePedidosStore } from '../../stores/pedidos'
 import { useClientesStore } from '../../stores/clientes'
 import { useAuthStore } from '../../stores/auth'
 import { useTheme } from '../../composables/useTheme'
-import solicitudesService from '../../services/solicitudesService'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,7 +22,6 @@ const authStore = useAuthStore()
 const { theme, toggle: toggleTheme } = useTheme()
 
 const storage = ref<StorageInfo | null>(null)
-const solicitudesAbiertas = ref(0)
 const sidebarOpen = ref(false)
 const tiendaMenuOpen = ref(false)
 const now = ref(new Date())
@@ -40,16 +38,6 @@ function stopClock() {
 
 async function cerrarSesion() { await authStore.logout() }
 
-async function cargarSolicitudesStats() {
-  if (!tiendaStore.tiendaActivaId) return
-  try {
-    const s = await solicitudesService.stats(tiendaStore.tiendaActivaId)
-    solicitudesAbiertas.value = s.total_abiertas
-  } catch (err) {
-    console.warn('[AppLayout] stats solicitudes:', err)
-  }
-}
-
 async function loadStorage() {
   try {
     storage.value = await dashboardService.getStorageInfo()
@@ -63,7 +51,6 @@ function recargarDatosTienda() {
   productosStore.fetchProductos(true)
   pedidosStore.fetchPedidos()
   clientesStore.fetchClientes()
-  cargarSolicitudesStats()
 }
 
 onMounted(async () => {
@@ -99,7 +86,6 @@ const navItems = computed(() => [
   },
   { name: 'Catálogo',     route: '/catalogo',     badge: 0, section: 'main' },
   { name: 'Clientes',     route: '/clientes',     badge: 0, section: 'main' },
-  { name: 'Solicitudes',  route: '/solicitudes',  badge: solicitudesAbiertas.value, section: 'main' },
   { name: 'Upsell',       route: '/upsell',       badge: 0, section: 'main' },
   { name: 'Economics',    route: '/economics',    badge: 0, section: 'main' },
   { name: 'Referidos',    route: '/referidos',    badge: 0, section: 'main' },
@@ -206,7 +192,6 @@ const storagePorcentaje = computed(() => storage.value?.usage_percent ?? 0)
           <svg v-else-if="item.name === 'Pedidos'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5h12M2 8h12M2 11h8" stroke-linecap="round"/></svg>
           <svg v-else-if="item.name === 'Catálogo'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="9" y="9" width="5" height="5" rx="0.5"/></svg>
           <svg v-else-if="item.name === 'Clientes'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke-linecap="round"/></svg>
-          <svg v-else-if="item.name === 'Solicitudes'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v10H3z"/><path d="M6 7h4M6 10h4" stroke-linecap="round"/></svg>
           <svg v-else-if="item.name === 'Upsell'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12l4-4 3 3 4-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 6h3v3" stroke-linecap="round"/></svg>
           <svg v-else-if="item.name === 'Economics'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13h12M4 13V9M7 13V7M10 13V5M13 13V3" stroke-linecap="round"/></svg>
           <svg v-else-if="item.name === 'Referidos'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="2"/><circle cx="11" cy="11" r="2"/><path d="M6 7l4 4" stroke-linecap="round"/></svg>

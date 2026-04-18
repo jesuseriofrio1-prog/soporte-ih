@@ -8,9 +8,11 @@ const routes = [
     component: () => import('../views/LoginView.vue'),
     meta: { public: true, title: 'Iniciar sesión' },
   },
-  // Formulario público sin layout: link compartible con clientes finales
+  // Formulario público de compra: siempre por producto. El link genérico
+  // de catálogo (/p/:slug sin producto) fue eliminado por decisión de
+  // producto — cada pedido se inicia desde el link de un producto.
   {
-    path: '/p/:tiendaSlug/:productoSlug?',
+    path: '/p/:tiendaSlug/:productoSlug',
     name: 'public-solicitud',
     component: () => import('../views/PublicSolicitudView.vue'),
     meta: { public: true },
@@ -90,12 +92,6 @@ const routes = [
         name: 'referidos',
         component: () => import('../views/ReferidosView.vue'),
         meta: { title: 'Referidos' },
-      },
-      {
-        path: 'solicitudes',
-        name: 'solicitudes',
-        component: () => import('../views/SolicitudesView.vue'),
-        meta: { title: 'Solicitudes públicas' },
       },
     ],
   },
