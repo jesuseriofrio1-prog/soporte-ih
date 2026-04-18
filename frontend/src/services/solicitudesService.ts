@@ -38,6 +38,11 @@ export interface CrearSolicitudBody {
   provincia?: string
   ciudad?: string
   direccion: string
+  /** Texto libre con pistas para el mensajero ("portón azul, timbre del medio"). */
+  direccion_referencia?: string
+  /** Coordenadas del map picker (WGS84). */
+  lat?: number
+  lng?: number
   cantidad?: number
   notas?: string
   producto_id?: string

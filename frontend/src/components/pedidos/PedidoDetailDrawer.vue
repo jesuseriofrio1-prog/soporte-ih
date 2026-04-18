@@ -204,6 +204,30 @@ const riesgoAccionable = computed(() =>
               <span v-if="pedido.provincia"> · {{ pedido.provincia }}</span>
               <span v-if="pedido.direccion" class="text-ink-faint"> · {{ pedido.direccion }}</span>
             </div>
+            <div
+              v-if="pedido.lat != null && pedido.lng != null"
+              class="flex items-center gap-2 mt-1 text-[11px]"
+            >
+              <a
+                :href="`https://www.google.com/maps/search/?api=1&query=${pedido.lat},${pedido.lng}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 font-medium hover:underline"
+                style="color: var(--accent);"
+              >
+                <svg class="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M8 1.5c-2.5 0-4.5 2-4.5 4.5 0 3.5 4.5 8 4.5 8s4.5-4.5 4.5-8c0-2.5-2-4.5-4.5-4.5z" />
+                  <circle cx="8" cy="6" r="1.5" />
+                </svg>
+                Ver en Maps
+              </a>
+              <span
+                v-if="pedido.direccion_referencia"
+                class="text-ink-faint"
+              >
+                · Ref: {{ pedido.direccion_referencia }}
+              </span>
+            </div>
           </div>
         </div>
 

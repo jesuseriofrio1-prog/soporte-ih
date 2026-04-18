@@ -113,6 +113,7 @@ Migraciones en `backend/supabase/migrations/` (aplicadas contra el proyecto Supa
 | 023 | `023_productos_bundles.sql` | `es_bundle` / `bundle_upgrade_desde` (upgrade cosmético) |
 | 024 | `024_referidos.sql` | Tabla `referidos` + `referido_codigo` en `solicitudes`/`pedidos` |
 | 025 | `025_productos_foto.sql` | `foto_url` en `productos` + bucket `producto-fotos` |
+| 026 | `026_direcciones_coordenadas.sql` | `lat` / `lng` / `direccion_referencia` en `solicitudes` y `pedidos` (Google Maps picker) |
 
 ## API — endpoints
 
@@ -251,6 +252,7 @@ Un solo proyecto Vercel: `soporteih` → https://soporteih.vercel.app
 |----------|--------|
 | `ANTHROPIC_API_KEY` | Matching de productos por IA en el import de Rocket |
 | `ROCKET_WEBHOOK_SECRET` | Secreto que Rocket debe incluir en la URL del webhook (`/api/webhooks/rocket/<secret>`) |
+| `VITE_GOOGLE_MAPS_API_KEY` | Map picker del formulario público (Google Maps JS + Geocoding). Debe restringirse por HTTP-referrer al dominio de producción |
 
 **Opcionales**:
 

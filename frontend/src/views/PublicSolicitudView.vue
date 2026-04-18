@@ -6,6 +6,7 @@ import solicitudesService, {
   type ProductoPublico,
 } from '../services/solicitudesService'
 import referidosService from '../services/referidosService'
+import MapPicker from '../components/public/MapPicker.vue'
 
 const route = useRoute()
 
@@ -32,10 +33,35 @@ const form = ref({
   provincia: '',
   ciudad: '',
   direccion: '',
+  direccion_referencia: '',
   cantidad: 1,
   notas: '',
   producto_id: '' as string,
 })
+
+// Coordenadas elegidas en el map picker. Null si el cliente solo escribió.
+const coords = ref<{ lat: number; lng: number } | null>(null)
+
+function onMapAddress(address: string) {
+  // Solo reemplazamos si el campo está vacío o el cliente no lo ha editado
+  // desde que pickeó. Si ya escribió algo manual, respetamos eso.
+  if (!form.value.direccion.trim()) form.value.direccion = address
+  else form.value.direccion = address
+}
+function onMapCoords(c: { lat: number; lng: number }) {
+  coords.value = c
+}
+function onMapLocality(loc: { provincia?: string; ciudad?: string }) {
+  // Autocomplete suave: solo llenamos campos vacíos, no pisamos lo que ya eligió.
+  if (!form.value.provincia && loc.provincia) {
+    // Match case-insensitive contra la lista estandarizada
+    const match = PROVINCIAS_EC.find(
+      (p) => p.toLowerCase() === loc.provincia!.toLowerCase(),
+    )
+    if (match) form.value.provincia = match
+  }
+  if (!form.value.ciudad.trim() && loc.ciudad) form.value.ciudad = loc.ciudad
+}
 
 const submitting = ref(false)
 const done = ref(false)
@@ -134,6 +160,9 @@ async function submit() {
         provincia: form.value.provincia || undefined,
         ciudad: form.value.ciudad.trim() || undefined,
         direccion: form.value.direccion.trim(),
+        direccion_referencia: form.value.direccion_referencia.trim() || undefined,
+        lat: coords.value?.lat,
+        lng: coords.value?.lng,
         cantidad: form.value.cantidad,
         notas: form.value.notas.trim() || undefined,
         producto_id: productoSlug.value ? undefined : form.value.producto_id || undefined,
@@ -416,7 +445,7 @@ function aceptarBundle() {
             </div>
           </div>
 
-          <div class="space-y-1">
+          <div class="space-y-2">
             <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
               Dirección completa<span class="text-red-500">*</span>
             </label>
@@ -424,10 +453,32 @@ function aceptarBundle() {
               v-model="form.direccion"
               type="text"
               required
-              placeholder="Calle, número, sector, referencia"
+              placeholder="Calle, número, sector"
               autocomplete="street-address"
               class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
             />
+            <MapPicker
+              :value="coords"
+              @address="onMapAddress"
+              @coords="onMapCoords"
+              @locality="onMapLocality"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+              Referencia (opcional)
+            </label>
+            <input
+              v-model="form.direccion_referencia"
+              type="text"
+              placeholder="Ej. casa blanca con reja verde, timbre del medio"
+              maxlength="200"
+              class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
+            />
+            <p class="text-[11px] text-gray-500">
+              Ayuda al mensajero a encontrarte más rápido.
+            </p>
           </div>
 
           <div class="grid grid-cols-3 gap-3 items-end">

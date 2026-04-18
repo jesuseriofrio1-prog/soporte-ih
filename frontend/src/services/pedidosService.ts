@@ -31,6 +31,10 @@ export interface Pedido {
   notas: string | null
   provincia: string | null
   tracking_code?: string
+  /** Coordenadas heredadas de la solicitud (si el cliente usó el map picker). */
+  lat: number | null
+  lng: number | null
+  direccion_referencia: string | null
   retencion_inicio: string | null
   created_at: string
   updated_at: string

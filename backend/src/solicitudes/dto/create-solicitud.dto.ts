@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -69,4 +70,24 @@ export class CreateSolicitudPublicDto {
   @IsString()
   @MaxLength(30)
   referido_codigo?: string;
+
+  /** Latitud WGS84 del punto elegido en el map picker. Opcional. */
+  @IsOptional()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  lat?: number;
+
+  /** Longitud WGS84 del punto elegido en el map picker. Opcional. */
+  @IsOptional()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  lng?: number;
+
+  /** Pistas libres para el mensajero ("portón azul, timbre del medio"). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  direccion_referencia?: string;
 }

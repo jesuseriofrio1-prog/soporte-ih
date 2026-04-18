@@ -173,6 +173,10 @@ export class SolicitudesService {
         provincia: params.body.provincia?.trim() || null,
         ciudad: params.body.ciudad?.trim() || null,
         direccion: params.body.direccion.trim(),
+        direccion_referencia:
+          params.body.direccion_referencia?.trim() || null,
+        lat: typeof params.body.lat === 'number' ? params.body.lat : null,
+        lng: typeof params.body.lng === 'number' ? params.body.lng : null,
         cantidad: params.body.cantidad ?? 1,
         notas: params.body.notas?.trim() || null,
         referido_codigo: refCodigo,
@@ -319,6 +323,42 @@ export class SolicitudesService {
         .update({ pedido_id: pedido.id, estado: 'ENLAZADA' })
         .eq('tienda_id', tiendaId)
         .eq('rocket_order_id', rocketOrderId);
+      await this.copiarCoordsAPedido(tiendaId, rocketOrderId, pedido.id);
+    }
+  }
+
+  /**
+   * Cuando una solicitud con coordenadas del map picker se enlaza con un
+   * pedido, copiamos lat/lng/referencia al pedido para que el admin pueda
+   * abrir Maps directo desde el drawer. No bloquea el enlace si falla.
+   */
+  private async copiarCoordsAPedido(
+    tiendaId: string,
+    rocketOrderId: string,
+    pedidoId: string,
+  ) {
+    try {
+      const db = this.supabase.getClient();
+      const { data: sol } = await db
+        .from('solicitudes')
+        .select('lat, lng, direccion_referencia')
+        .eq('tienda_id', tiendaId)
+        .eq('rocket_order_id', rocketOrderId)
+        .maybeSingle();
+      if (!sol) return;
+      if (sol.lat == null && sol.lng == null && !sol.direccion_referencia) return;
+      await db
+        .from('pedidos')
+        .update({
+          lat: sol.lat,
+          lng: sol.lng,
+          direccion_referencia: sol.direccion_referencia,
+        })
+        .eq('id', pedidoId);
+    } catch (err) {
+      this.log.warn(
+        `No se pudo copiar coords al pedido ${pedidoId}: ${(err as Error).message}`,
+      );
     }
   }
 
@@ -336,6 +376,7 @@ export class SolicitudesService {
         .eq('tienda_id', tiendaId)
         .eq('rocket_order_id', rocketOrderId)
         .in('estado', ['PENDIENTE', 'ENVIADA_A_ROCKET']);
+      await this.copiarCoordsAPedido(tiendaId, rocketOrderId, pedidoId);
     } catch (err) {
       this.log.warn(
         `No se pudo enlazar solicitud con rocket_order_id=${rocketOrderId}: ${(err as Error).message}`,
