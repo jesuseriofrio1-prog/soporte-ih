@@ -92,21 +92,35 @@ export class PedidosService {
     const db = this.supabase.getClient();
     const telefonoNorm = normalizarTelefono(dto.cliente_telefono);
 
-    // 1. Verificar que el producto existe
+    // 1. Verificar que la tienda existe
+    const { data: tienda, error: errTienda } = await db
+      .from('tiendas')
+      .select('id')
+      .eq('id', dto.tienda_id)
+      .single();
+
+    if (errTienda || !tienda) {
+      throw new NotFoundException(`Tienda con id "${dto.tienda_id}" no encontrada`);
+    }
+
+    // 2. Verificar que el producto existe y pertenece a la tienda
     const { data: producto, error: errProd } = await db
       .from('productos')
-      .select('id, activo')
+      .select('id, activo, tienda_id')
       .eq('id', dto.producto_id)
       .single();
 
     if (errProd || !producto) {
       throw new NotFoundException(`Producto con id "${dto.producto_id}" no encontrado`);
     }
+    if (producto.tienda_id !== dto.tienda_id) {
+      throw new BadRequestException('El producto no pertenece a la tienda indicada');
+    }
     if (!producto.activo) {
       throw new BadRequestException('El producto no está activo');
     }
 
-    // 2. Descontar stock atómicamente (evita race conditions)
+    // 3. Descontar stock atómicamente (evita race conditions)
     const { data: stockOk, error: errStock } = await db.rpc('descontar_stock', {
       p_producto_id: dto.producto_id,
     });
@@ -116,7 +130,7 @@ export class PedidosService {
       throw new BadRequestException('El producto no tiene stock disponible');
     }
 
-    // 3. Buscar o crear cliente
+    // 4. Buscar o crear cliente
     let clienteId: string;
 
     const { data: clienteExistente, error: errBusca } = await db
@@ -145,7 +159,7 @@ export class PedidosService {
       clienteId = nuevoCliente.id;
     }
 
-    // 4. Crear el pedido
+    // 5. Crear el pedido
     const { data: pedido, error: errPedido } = await db
       .from('pedidos')
       .insert({
@@ -167,7 +181,7 @@ export class PedidosService {
 
     if (errPedido) throw errPedido;
 
-    // 5. Registrar en historial
+    // 6. Registrar en historial
     const { error: errHist } = await db.from('historial_estados').insert({
       pedido_id: pedido.id,
       estado_anterior: null,

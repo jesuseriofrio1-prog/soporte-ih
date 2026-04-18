@@ -1,6 +1,7 @@
 -- ============================================
--- SKINNA - Schema inicial
+-- Soporte IH - Schema inicial (legado)
 -- 001_initial_schema.sql
+-- Nota: los cambios multi-tienda y los estados nuevos están en 002_multi_tienda.sql.
 -- ============================================
 
 -- ===================

@@ -26,16 +26,25 @@ async function bootstrap() {
       }),
     );
 
+    // CORS: exige FRONTEND_URL en producción. En dev permite localhost.
+    const isProd = process.env.NODE_ENV === 'production';
     const origins: string[] = [];
+
     if (process.env.FRONTEND_URL) {
       origins.push(process.env.FRONTEND_URL);
     }
-    if (process.env.NODE_ENV !== 'production') {
+    if (!isProd) {
       origins.push('http://localhost:5173');
     }
 
+    if (origins.length === 0) {
+      throw new Error(
+        'FRONTEND_URL es requerido en producción. Configura la variable de entorno.',
+      );
+    }
+
     nestApp.enableCors({
-      origin: origins.length > 0 ? origins : '*',
+      origin: origins,
       credentials: true,
     });
 
@@ -51,7 +60,7 @@ export default async (req: Request, res: Response) => {
     const instance = await bootstrap();
     instance(req, res);
   } catch (error) {
-    console.error('SKINNA bootstrap error:', error);
+    console.error('Soporte IH bootstrap error:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };

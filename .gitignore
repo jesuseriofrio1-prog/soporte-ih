@@ -3,7 +3,16 @@ node_modules/
 
 # Variables de entorno
 .env
-.env.local
+.env.*
+!.env.example
+*.env
+
+# Vercel
+.vercel/
+
+# Firebase service account
+*firebase-adminsdk*.json
+serviceAccountKey.json
 
 # Build
 dist/

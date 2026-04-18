@@ -1,7 +1,7 @@
 {
-  "name": "skinna",
+  "name": "soporte-ih",
   "version": "1.0.0",
-  "description": "Panel interno de gestión de pedidos - SKINNA Skincare",
+  "description": "Soporte IH - Plataforma multi-tienda de gestión de pedidos",
   "private": true,
   "scripts": {
     "dev:backend": "npm run start:dev --prefix backend",

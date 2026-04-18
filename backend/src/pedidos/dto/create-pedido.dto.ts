@@ -49,7 +49,6 @@ export class CreatePedidoDto {
   @IsString()
   notas?: string;
 
-  @IsString()
-  @IsNotEmpty({ message: 'tienda_id es requerido' })
+  @IsUUID('4', { message: 'tienda_id debe ser un UUID válido' })
   tienda_id: string;
 }

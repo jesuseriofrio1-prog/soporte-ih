@@ -1,1 +1,19 @@
+node_modules
+dist
+coverage
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+*.env
+
+# Firebase service account
+*firebase-adminsdk*.json
+serviceAccountKey.json
+
+# Vercel
 .vercel
+
+# OS
+.DS_Store

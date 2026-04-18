@@ -67,7 +67,7 @@ export class NotificationsService {
     // Enviar push
     const resultado = await this.firebaseAdmin.sendToMultiple(
       tokens,
-      '🚨 Alerta SKINNA',
+      '🚨 Alerta Soporte IH',
       `Tienes ${cantidad} pedido(s) en riesgo de devolución`,
     );
 

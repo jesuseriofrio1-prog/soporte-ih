@@ -21,7 +21,7 @@ async function handleLogin() {
   loading.value = true
   try {
     await authStore.login(email.value, password.value)
-    toast.success('Bienvenido a SKINNA')
+    toast.success('Bienvenido a Soporte IH')
     router.push('/dashboard')
   } catch (e: unknown) {
     const err = e as { response?: { status?: number }; request?: unknown }
@@ -47,7 +47,7 @@ async function handleLogin() {
     <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
       <!-- Logo -->
       <div class="text-center mb-8">
-        <h1 class="text-4xl font-black text-navy tracking-tighter">✨ SKINNA</h1>
+        <h1 class="text-4xl font-black text-navy tracking-tighter">✨ Soporte IH</h1>
         <p class="text-xs uppercase tracking-widest text-lavanda-medio mt-1">Panel de Gestión</p>
       </div>
 
@@ -58,7 +58,7 @@ async function handleLogin() {
           <input
             v-model="email"
             type="email"
-            placeholder="admin@skinna.ec"
+            placeholder="admin@soporteih.com"
             class="w-full px-4 py-3 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy placeholder-lavanda-medio focus:outline-none focus:border-mauve transition"
           />
         </div>

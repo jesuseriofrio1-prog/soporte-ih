@@ -20,15 +20,27 @@ async function bootstrap() {
     }),
   );
 
-  // CORS: permitir frontend local y dominio de Vercel
-  const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
+  // CORS: en producción exige FRONTEND_URL; en dev permite localhost:5173.
+  const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+  const frontendUrl = configService.get<string>('FRONTEND_URL');
+  const origins: string[] = [];
+
+  if (frontendUrl) origins.push(frontendUrl);
+  if (nodeEnv !== 'production') origins.push('http://localhost:5173');
+
+  if (origins.length === 0) {
+    throw new Error(
+      'FRONTEND_URL es requerido en producción. Configura la variable de entorno.',
+    );
+  }
+
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:5173'],
+    origin: origins,
     credentials: true,
   });
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
-  console.log(`SKINNA Backend corriendo en puerto ${port}`);
+  console.log(`Soporte IH Backend corriendo en puerto ${port}`);
 }
 bootstrap();

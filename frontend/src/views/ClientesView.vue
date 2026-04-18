@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
 import Drawer from 'primevue/drawer'
 import { useClientesStore } from '../stores/clientes'
+import { useTiendaStore } from '../stores/tienda'
 import { abrirWhatsApp } from '../composables/useWhatsApp'
 import Dialog from 'primevue/dialog'
 import Swal from 'sweetalert2'
@@ -11,6 +12,7 @@ import type { Cliente } from '../services/clientesService'
 
 const toast = useToast()
 const store = useClientesStore()
+const tiendaStore = useTiendaStore()
 
 // Modal crear cliente
 const crearModalVisible = ref(false)
@@ -180,7 +182,8 @@ const estadoEstilos: Record<string, string> = {
 }
 
 function enviarWA(telefono: string, nombre: string) {
-  const msg = `¡Hola ${nombre}! ✨ Te escribimos del equipo de SKINNA. ¿En qué podemos ayudarte?`
+  const tienda = tiendaStore.tiendaActiva?.nombre || 'nuestra tienda'
+  const msg = `¡Hola ${nombre}! ✨ Te escribimos del equipo de ${tienda}. ¿En qué podemos ayudarte?`
   abrirWhatsApp(telefono, msg)
 }
 

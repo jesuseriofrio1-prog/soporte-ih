@@ -9,6 +9,9 @@ import {
   type PlantillaWA,
   type DatosPlantilla,
 } from '../../composables/useWhatsApp'
+import { useTiendaStore } from '../../stores/tienda'
+
+const tiendaStore = useTiendaStore()
 
 const props = defineProps<{
   visible: boolean
@@ -39,6 +42,7 @@ const datos = computed<DatosPlantilla>(() => ({
   nombre: props.nombre,
   producto: props.producto,
   guia: props.guia,
+  tienda: tiendaStore.tiendaActiva?.nombre || 'nuestra tienda',
   agencia: props.direccion || 'tu ciudad',
 }))
 

@@ -8,6 +8,7 @@ import {
   Body,
   Query,
   ParseUUIDPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { PedidosService } from './pedidos.service';
 import { CreatePedidoDto } from './dto/create-pedido.dto';
@@ -28,6 +29,13 @@ export class PedidosController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
+    // Validar tienda_id: requerido y formato UUID
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!tienda_id || !UUID_REGEX.test(tienda_id)) {
+      throw new BadRequestException('tienda_id es requerido y debe ser un UUID válido');
+    }
+
     return this.pedidosService.findAll({
       tienda_id,
       estado,

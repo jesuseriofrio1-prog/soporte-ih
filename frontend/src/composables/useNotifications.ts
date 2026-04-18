@@ -9,7 +9,7 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || ''
 export async function requestPermission() {
   try {
     // Verificar si ya se registró
-    if (localStorage.getItem('skinna_fcm_registered') === 'true') return
+    if (localStorage.getItem('soporte_ih_fcm_registered') === 'true') return
 
     const messaging = await getMessagingInstance()
     if (!messaging) return
@@ -21,10 +21,10 @@ export async function requestPermission() {
     if (!token) return
 
     // Guardar y registrar en backend
-    localStorage.setItem('skinna_fcm_token', token)
+    localStorage.setItem('soporte_ih_fcm_token', token)
 
     await api.post('/notifications/register-token', { token })
-    localStorage.setItem('skinna_fcm_registered', 'true')
+    localStorage.setItem('soporte_ih_fcm_registered', 'true')
   } catch (error) {
     console.error('Error al registrar notificaciones:', error)
   }
@@ -38,7 +38,7 @@ export async function onMessageReceived() {
   const toast = useToast()
 
   onMessage(messaging, (payload) => {
-    const titulo = payload.notification?.title || 'SKINNA'
+    const titulo = payload.notification?.title || 'Soporte IH'
     const cuerpo = payload.notification?.body || ''
 
     toast.info(`${titulo}: ${cuerpo}`, {

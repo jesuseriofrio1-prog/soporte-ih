@@ -4,27 +4,28 @@ export interface DatosPlantilla {
   nombre: string
   producto: string
   guia: string
+  tienda: string
   agencia?: string
 }
 
 const PLANTILLAS: Record<PlantillaWA, string> = {
   NUEVO:
-    '¡Hola {nombre}! ✨ Tu rutina perfecta está en camino. 📦 Te confirmamos que tu *{producto}* de SKINNA ya salió de nuestra bodega y viaja hacia ti.\n\nPuedes seguir su recorrido en la web de Servientrega con esta guía: *{guia}*.\n\n¡Nos emociona mucho que lo pruebes! Si tienes alguna duda, aquí estamos para ayudarte. 💖',
+    '¡Hola {nombre}! ✨ Tu pedido está en camino. 📦 Te confirmamos que tu *{producto}* de {tienda} ya salió de nuestra bodega y viaja hacia ti.\n\nPuedes seguir su recorrido en la web de Servientrega con esta guía: *{guia}*.\n\n¡Nos emociona mucho que lo pruebes! Si tienes alguna duda, aquí estamos para ayudarte. 💖',
 
   LLEGO_AGENCIA:
-    '¡Hola {nombre}! Buenas noticias 🌟 Tu *{producto}* de SKINNA ya te está esperando en la agencia Servientrega de *{agencia}*.\n\nPuedes pasar a retirarlo desde hoy presentando tu cédula y este número de guía: *{guia}*.\n\n¡No dejes esperar a tu piel, ve por él! ✨',
+    '¡Hola {nombre}! Buenas noticias 🌟 Tu *{producto}* de {tienda} ya te está esperando en la agencia Servientrega de *{agencia}*.\n\nPuedes pasar a retirarlo desde hoy presentando tu cédula y este número de guía: *{guia}*.\n\n¡No dejes esperar tu pedido, ve por él! ✨',
 
   ALERTA:
-    '¡Hola {nombre}! 🚨 Te escribimos del equipo de SKINNA porque notamos que tu *{producto}* sigue esperándote en Servientrega (*{agencia}*).\n\n¡Cuidado! El paquete lleva varios días allí y el sistema lo devolverá a nuestra bodega mañana. 😰 Por favor, ayúdanos retirándolo HOY con tu guía: *{guia}*.\n\n¿Tuviste algún inconveniente para ir? Avísanos de inmediato por aquí para intentar ayudarte. 🙏',
+    '¡Hola {nombre}! 🚨 Te escribimos del equipo de {tienda} porque notamos que tu *{producto}* sigue esperándote en Servientrega (*{agencia}*).\n\n¡Cuidado! El paquete lleva varios días allí y el sistema lo devolverá a nuestra bodega mañana. 😰 Por favor, ayúdanos retirándolo HOY con tu guía: *{guia}*.\n\n¿Tuviste algún inconveniente para ir? Avísanos de inmediato por aquí para intentar ayudarte. 🙏',
 
   NOVEDAD_DOMICILIO:
-    '¡Hola {nombre}! 🛵 Los chicos de Servientrega intentaron entregar tu pedido de SKINNA, pero nos reportan un problema para ubicar la dirección.\n\nPor favor, confírmanos una referencia por este medio para coordinar un nuevo intento rápido. Tu guía es: *{guia}*.\n\n¡Queremos que tengas tu pedido cuanto antes! ✨',
+    '¡Hola {nombre}! 🛵 Los chicos de Servientrega intentaron entregar tu pedido de {tienda}, pero nos reportan un problema para ubicar la dirección.\n\nPor favor, confírmanos una referencia por este medio para coordinar un nuevo intento rápido. Tu guía es: *{guia}*.\n\n¡Queremos que tengas tu pedido cuanto antes! ✨',
 
   REPARTO:
-    '¡Hola {nombre}! 🛵 ¡El gran día llegó! Tu *{producto}* de SKINNA está en reparto con los chicos de Servientrega y llegará a tu domicilio HOY. 🎉\n\nPor favor, asegúrate de estar pendiente del teléfono o de que haya alguien en casa para recibirlo (tu guía es: *{guia}*). ¡Ya casi tienes tu nueva rutina en tus manos! ✨',
+    '¡Hola {nombre}! 🛵 ¡El gran día llegó! Tu *{producto}* de {tienda} está en reparto con los chicos de Servientrega y llegará a tu domicilio HOY. 🎉\n\nPor favor, asegúrate de estar pendiente del teléfono o de que haya alguien en casa para recibirlo (tu guía es: *{guia}*). ¡Ya casi tienes tu pedido en tus manos! ✨',
 
   LIBRE:
-    '¡Hola {nombre}! Te escribimos del equipo de SKINNA con respecto a tu pedido de *{producto}* (Guía: *{guia}*).\n\n...',
+    '¡Hola {nombre}! Te escribimos del equipo de {tienda} con respecto a tu pedido de *{producto}* (Guía: *{guia}*).\n\n...',
 }
 
 /** Etiquetas legibles para cada plantilla */
@@ -63,6 +64,7 @@ export function generarMensaje(plantilla: PlantillaWA, datos: DatosPlantilla): s
   texto = texto.replace(/\{nombre\}/g, datos.nombre)
   texto = texto.replace(/\{producto\}/g, datos.producto)
   texto = texto.replace(/\{guia\}/g, datos.guia)
+  texto = texto.replace(/\{tienda\}/g, datos.tienda)
   texto = texto.replace(/\{agencia\}/g, datos.agencia || 'tu ciudad')
   return texto
 }
