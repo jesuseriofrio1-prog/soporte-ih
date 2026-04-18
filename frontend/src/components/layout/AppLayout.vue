@@ -8,6 +8,7 @@ import { useDashboardStore } from '../../stores/dashboard'
 import { useProductosStore } from '../../stores/productos'
 import { usePedidosStore } from '../../stores/pedidos'
 import { useClientesStore } from '../../stores/clientes'
+import { useAuthStore } from '../../stores/auth'
 import solicitudesService from '../../services/solicitudesService'
 
 const route = useRoute()
@@ -17,6 +18,11 @@ const dashStore = useDashboardStore()
 const productosStore = useProductosStore()
 const pedidosStore = usePedidosStore()
 const clientesStore = useClientesStore()
+const authStore = useAuthStore()
+
+async function cerrarSesion() {
+  await authStore.logout()
+}
 
 // Almacenamiento
 const storage = ref<StorageInfo | null>(null)
@@ -218,6 +224,19 @@ const storageBarColor = computed(() => {
             <span>{{ storage.records.total }} registros</span>
             <span>{{ storage.usage_percent }}%</span>
           </div>
+        </div>
+        <!-- Usuario + logout -->
+        <div v-if="authStore.userEmail" class="mt-2 mb-3 pb-3 border-b border-lavanda-medio/20">
+          <p class="text-[10px] uppercase tracking-wider text-lavanda-medio/60 mb-1">Sesión</p>
+          <p class="text-xs text-white/80 truncate" :title="authStore.userEmail">
+            <i class="pi pi-user mr-1" aria-hidden="true"></i>{{ authStore.userEmail }}
+          </p>
+          <button
+            @click="cerrarSesion"
+            class="mt-2 text-[11px] text-lavanda-medio hover:text-white transition flex items-center gap-1"
+          >
+            <i class="pi pi-sign-out" aria-hidden="true"></i> Cerrar sesión
+          </button>
         </div>
         <p class="text-xs text-center text-lavanda-medio">Soporte IH v2.0</p>
       </div>

@@ -1,9 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
+  // Ruta pública de login
   {
-    path: '/',
-    redirect: '/dashboard',
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/LoginView.vue'),
+    meta: { public: true, title: 'Iniciar sesión' },
   },
   // Formulario público sin layout: link compartible con clientes finales
   {
@@ -11,6 +14,10 @@ const routes = [
     name: 'public-solicitud',
     component: () => import('../views/PublicSolicitudView.vue'),
     meta: { public: true },
+  },
+  {
+    path: '/',
+    redirect: '/dashboard',
   },
   {
     path: '/',
@@ -28,11 +35,7 @@ const routes = [
         component: () => import('../views/PedidosView.vue'),
         meta: { title: 'Envíos / Pedidos' },
       },
-      // Redirect legacy /novedades al filtro chip de Pedidos
-      {
-        path: 'novedades',
-        redirect: '/pedidos?filtro=novedades',
-      },
+      { path: 'novedades', redirect: '/pedidos?filtro=novedades' },
       {
         path: 'catalogo',
         name: 'catalogo',
@@ -65,11 +68,38 @@ const routes = [
       },
     ],
   },
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+/**
+ * Guard de auth. Las rutas `meta.public === true` no requieren login. Para el
+ * resto, validamos la cookie de sesión con GET /auth/me en el primer hit y
+ * cacheamos el resultado en `authStore.checked`. Si /auth/me falla, redirect
+ * a /login con ?redirect= para volver después.
+ */
+router.beforeEach(async (to) => {
+  // Lazy import para evitar ciclos pinia ↔ router.
+  const { useAuthStore } = await import('../stores/auth')
+  const auth = useAuthStore()
+
+  const isPublic = to.matched.some((r) => r.meta?.public)
+
+  // Validamos sesión una vez por carga (cubre refresh de página).
+  if (!auth.checked) {
+    await auth.checkToken()
+  }
+
+  if (!isPublic && !auth.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (to.name === 'login' && auth.isAuthenticated) {
+    return { path: '/dashboard' }
+  }
 })
 
 export default router

@@ -8,6 +8,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { timingSafeEqual } from 'crypto';
+import { Public } from '../auth/public.decorator';
 import { WebhooksService, type RocketWebhookPayload } from './webhooks.service';
 
 /**
@@ -21,7 +23,12 @@ import { WebhooksService, type RocketWebhookPayload } from './webhooks.service';
 export class WebhooksController {
   constructor(private readonly webhooks: WebhooksService) {}
 
-  /** Rocket hace POST aquí cuando cambia el estado de un pedido. */
+  /**
+   * Rocket hace POST aquí cuando cambia el estado de un pedido.
+   * Es @Public() porque Rocket no puede firmar JWTs — la autenticación
+   * va por secreto-en-URL comparado en tiempo constante.
+   */
+  @Public()
   @Post('rocket/:secret')
   @Throttle({ default: { ttl: 60000, limit: 120 } })
   async recibirRocket(
@@ -49,7 +56,11 @@ export class WebhooksController {
       // Fail-closed: si no configuraron el secreto, rechazamos todo.
       throw new ForbiddenException('Webhook no configurado (falta ROCKET_WEBHOOK_SECRET)');
     }
-    if (!secret || secret !== esperado) {
+    // timing-safe compare: compara siempre todos los bytes para no filtrar
+    // el largo del secreto correcto vía medición de tiempo.
+    const a = Buffer.from(secret ?? '', 'utf8');
+    const b = Buffer.from(esperado, 'utf8');
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
       throw new ForbiddenException('Secreto inválido');
     }
   }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
@@ -8,6 +9,7 @@ import { ClientesModule } from './clientes/clientes.module';
 import { PedidosModule } from './pedidos/pedidos.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/auth.guard';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TiendasModule } from './tiendas/tiendas.module';
 import { TrackingModule } from './tracking/tracking.module';
@@ -38,6 +40,9 @@ import { SolicitudesModule } from './solicitudes/solicitudes.module';
     SolicitudesModule,
   ],
   controllers: [AppController],
-  providers: [],
+  providers: [
+    // Guard global: todas las rutas requieren JWT salvo las marcadas @Public()
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}

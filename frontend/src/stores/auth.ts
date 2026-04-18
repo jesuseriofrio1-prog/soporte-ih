@@ -3,68 +3,78 @@ import { ref, computed } from 'vue'
 import api from '../services/api'
 import router from '../router'
 
-const TOKEN_KEY = 'soporte_ih_token'
-const EMAIL_KEY = 'soporte_ih_user_email'
-const FCM_KEY = 'soporte_ih_fcm_registered'
+/**
+ * Store de autenticación.
+ *
+ * Modelo: cookies HttpOnly. NO almacenamos el JWT en localStorage ni en memoria
+ * para que un eventual XSS no pueda robarlo. El estado local que conservamos
+ * (email, id) es sólo UX: el "source of truth" es siempre el backend vía
+ * GET /auth/me.
+ *
+ * Limpieza legacy: borramos cualquier token antiguo de versiones previas
+ * (localStorage-based) para evitar confusión.
+ */
 
-// Migración one-shot desde las keys antiguas ("skinna_*") a las nuevas.
-// Se puede eliminar en un release futuro cuando todos los clientes hayan actualizado.
-;(function migrateLegacyKeys() {
-  const legacyToken = localStorage.getItem('skinna_token')
-  if (legacyToken && !localStorage.getItem(TOKEN_KEY)) {
-    localStorage.setItem(TOKEN_KEY, legacyToken)
+const LEGACY_KEYS = [
+  'soporte_ih_token',
+  'soporte_ih_user_email',
+  'skinna_token',
+  'skinna_user_email',
+]
+;(function limpiarLegacy() {
+  try {
+    for (const k of LEGACY_KEYS) localStorage.removeItem(k)
+  } catch {
+    // Silencioso: algunos entornos (Safari en modo privado) no permiten ls.
   }
-  const legacyEmail = localStorage.getItem('skinna_user_email')
-  if (legacyEmail && !localStorage.getItem(EMAIL_KEY)) {
-    localStorage.setItem(EMAIL_KEY, legacyEmail)
-  }
-  const legacyFcm = localStorage.getItem('skinna_fcm_registered')
-  if (legacyFcm && !localStorage.getItem(FCM_KEY)) {
-    localStorage.setItem(FCM_KEY, legacyFcm)
-  }
-  localStorage.removeItem('skinna_token')
-  localStorage.removeItem('skinna_user_email')
-  localStorage.removeItem('skinna_fcm_registered')
 })()
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
-  const userEmail = ref<string | null>(localStorage.getItem(EMAIL_KEY))
+  // Estado cacheado (se refresca con checkToken). Null = no logueado / desconocido.
+  const userId = ref<string | null>(null)
+  const userEmail = ref<string | null>(null)
+  const checked = ref(false) // si ya llamamos a /auth/me en esta sesión
 
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!userId.value)
 
   async function login(email: string, password: string) {
+    // El backend setea cookies HttpOnly (sih_session, sih_csrf) y devuelve el user.
     const { data } = await api.post('/auth/login', { email, password })
-
-    token.value = data.access_token
-    userEmail.value = data.user.email
-
-    localStorage.setItem(TOKEN_KEY, data.access_token)
-    localStorage.setItem(EMAIL_KEY, data.user.email)
+    userId.value = data.user.id
+    userEmail.value = data.user.email ?? null
+    checked.value = true
   }
 
-  function logout() {
-    token.value = null
-    userEmail.value = null
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(EMAIL_KEY)
-    localStorage.removeItem(FCM_KEY)
-    // Auth está deshabilitada por decisión de producto — no hay ruta /login
-    // registrada. Si se reactiva el flujo, añadir la ruta y volver a apuntar.
-    router.push('/')
-  }
-
-  /** Verifica que el token guardado siga siendo válido */
-  async function checkToken() {
-    if (!token.value) return false
+  async function logout() {
     try {
-      await api.get('/dashboard/stats')
+      await api.post('/auth/logout')
+    } catch {
+      // Ignorar: limpiamos estado local igual.
+    }
+    userId.value = null
+    userEmail.value = null
+    checked.value = true
+    router.push('/login')
+  }
+
+  /**
+   * Verifica que la cookie de sesión siga viva. Llama a GET /auth/me.
+   * Devuelve true/false. Si falla con 401 el interceptor ya redirige.
+   */
+  async function checkToken(): Promise<boolean> {
+    try {
+      const { data } = await api.get('/auth/me')
+      userId.value = data.id
+      userEmail.value = data.email ?? null
+      checked.value = true
       return true
     } catch {
-      logout()
+      userId.value = null
+      userEmail.value = null
+      checked.value = true
       return false
     }
   }
 
-  return { token, userEmail, isAuthenticated, login, logout, checkToken }
+  return { userId, userEmail, isAuthenticated, checked, login, logout, checkToken }
 })
