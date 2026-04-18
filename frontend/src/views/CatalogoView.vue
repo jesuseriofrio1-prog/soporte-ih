@@ -199,7 +199,7 @@ onMounted(() => {
           </button>
           <button
             @click.stop="eliminar(producto)"
-            class="text-xs text-alerta/60 hover:text-alerta font-medium opacity-0 group-hover:opacity-100 transition"
+            class="text-xs text-alerta/60 hover:text-alerta font-medium transition"
           >
             <i class="pi pi-trash"></i> Eliminar
           </button>
