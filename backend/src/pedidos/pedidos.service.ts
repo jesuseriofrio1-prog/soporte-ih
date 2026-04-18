@@ -16,6 +16,9 @@ const TODOS_LOS_ESTADOS = [
   'ENTREGADO', 'NO_ENTREGADO', 'DEVUELTO',
 ];
 
+/** Estados terminales — el pedido ya está cerrado y no requiere más acción */
+const ESTADOS_TERMINALES = new Set(['ENTREGADO', 'NO_ENTREGADO', 'DEVUELTO']);
+
 @Injectable()
 export class PedidosService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -310,9 +313,16 @@ export class PedidosService {
       throw new BadRequestException(`El pedido ya está en estado ${nuevoEstado}`);
     }
 
+    // Si el nuevo estado es terminal (entregado/devuelto/no entregado),
+    // limpiamos el timer de retención para que no quede colgado.
+    const patch: { estado: string; retencion_inicio?: null } = { estado: nuevoEstado };
+    if (ESTADOS_TERMINALES.has(nuevoEstado)) {
+      patch.retencion_inicio = null;
+    }
+
     const { data: pedidoActualizado, error: errUpdate } = await db
       .from('pedidos')
-      .update({ estado: nuevoEstado })
+      .update(patch)
       .eq('id', id)
       .select()
       .single();

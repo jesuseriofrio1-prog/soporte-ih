@@ -261,6 +261,9 @@ const ESTADOS_ACTIVOS = ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION'] as const
 // Estados considerados "novedad" — requieren atención del operador
 const ESTADOS_NOVEDAD = ['NOVEDAD', 'NO_ENTREGADO'] as const
 
+// Estados terminales — pedido ya cerrado, sin acción pendiente
+const ESTADOS_TERMINALES = ['ENTREGADO', 'DEVUELTO', 'NO_ENTREGADO'] as const
+
 function diasDesde(iso: string): number {
   const ms = Date.now() - new Date(iso).getTime()
   return Math.floor(ms / (1000 * 60 * 60 * 24))
@@ -268,7 +271,13 @@ function diasDesde(iso: string): number {
 
 function matchesAntiguedad(p: Pedido, filtro: AntiguedadKey): boolean {
   if (filtro === 'todos') return true
-  if (filtro === 'aplazados') return p.retencion_inicio !== null
+  if (filtro === 'aplazados') {
+    // Sólo cuenta pedidos aún abiertos — si ya fue entregado/devuelto/
+    // no entregado, la retención queda colgada (legado) y no debe
+    // aparecer aquí.
+    if (ESTADOS_TERMINALES.includes(p.estado as typeof ESTADOS_TERMINALES[number])) return false
+    return p.retencion_inicio !== null
+  }
 
   if (filtro === 'novedades') {
     const enNovedad = ESTADOS_NOVEDAD.includes(p.estado as typeof ESTADOS_NOVEDAD[number])
