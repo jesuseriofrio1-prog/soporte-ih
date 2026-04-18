@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Line, Doughnut } from 'vue-chartjs'
 import {
@@ -237,26 +237,58 @@ const canalesChartOptions = {
 // Lifecycle
 // ─────────────────────────────────────────────
 
-onMounted(() => {
-  dashStore.fetchAll()
-  productosStore.fetchProductos(true)
-})
+// Auto-refresh: cada 60 segundos revalida los datos del dashboard en
+// background. El usuario puede pausarlo con el toggle del header.
+const autoRefreshMs = 60_000
+const autoRefreshOn = ref(true)
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 function refrescar() {
   dashStore.fetchAll()
   productosStore.fetchProductos(true)
 }
+
+function toggleAutoRefresh() {
+  autoRefreshOn.value = !autoRefreshOn.value
+  if (autoRefreshOn.value) startPolling()
+  else stopPolling()
+}
+
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') refrescar()
+  }, autoRefreshMs)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+onMounted(() => {
+  dashStore.fetchAll()
+  productosStore.fetchProductos(true)
+  startPolling()
+})
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Timestamp + refresh -->
-    <div class="flex items-center gap-3 text-xs text-navy/60">
+    <!-- Timestamp + refresh + auto-refresh toggle -->
+    <div class="flex items-center gap-3 text-xs text-navy/60 flex-wrap">
       <span>
         Actualizado:
         <b v-if="dashStore.stats">{{ formatTimestamp(dashStore.stats.actualizado_en) }}</b>
         <span v-else>—</span>
       </span>
+
       <button
         @click="refrescar"
         :disabled="dashStore.loading"
@@ -265,6 +297,19 @@ function refrescar() {
       >
         <i class="pi pi-refresh" :class="{ 'pi-spin': dashStore.loading }" aria-hidden="true"></i>
         <span>Refrescar</span>
+      </button>
+
+      <button
+        @click="toggleAutoRefresh"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition"
+        :class="autoRefreshOn
+          ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100'
+          : 'border-lavanda-medio text-navy/60 hover:bg-lavanda/50'"
+        :aria-label="autoRefreshOn ? 'Pausar auto-refresh' : 'Activar auto-refresh'"
+        :title="autoRefreshOn ? 'Auto-refresh activo cada 60s — click para pausar' : 'Auto-refresh pausado — click para reactivar'"
+      >
+        <span class="inline-block w-1.5 h-1.5 rounded-full" :class="autoRefreshOn ? 'bg-green-500 animate-pulse' : 'bg-navy/30'"></span>
+        <span>Auto {{ autoRefreshOn ? 'ON' : 'OFF' }}</span>
       </button>
     </div>
 
@@ -350,7 +395,7 @@ function refrescar() {
           <p
             v-if="dashStore.stats.riesgo_devolucion > 0"
             class="text-xs font-bold text-red-600 mt-2 cursor-pointer hover:underline"
-            @click="router.push('/pedidos')"
+            @click="router.push({ path: '/pedidos', query: { filtro: 'novedades' } })"
           >
             <i class="pi pi-exclamation-circle" aria-hidden="true"></i> Requieren atención hoy
           </p>
@@ -435,7 +480,7 @@ function refrescar() {
           <p
             v-if="dashStore.stats.novedades > 0"
             class="text-xs font-bold text-orange-700 mt-2 cursor-pointer hover:underline"
-            @click="router.push('/novedades')"
+            @click="router.push({ path: '/pedidos', query: { filtro: 'novedades' } })"
           >
             <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
             {{ dashStore.stats.novedades }} novedad{{ dashStore.stats.novedades > 1 ? 'es' : '' }}
@@ -479,42 +524,24 @@ function refrescar() {
         </div>
       </div>
 
-      <!-- ================== Panel Insights ================== -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-3 bg-navy p-6 rounded-xl shadow-md text-white relative overflow-hidden">
-          <i class="pi pi-sparkles absolute top-4 right-4 text-mauve text-4xl opacity-20" aria-hidden="true"></i>
-
-          <h3 class="text-lg font-black text-mauve flex items-center gap-2 mb-4">
-            Resumen
-          </h3>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
-              <p class="text-xs font-bold text-lavanda-medio mb-1">
-                <i class="pi pi-box" aria-hidden="true"></i> Inventario
-              </p>
-              <p v-if="productoMenorStock" class="text-sm font-medium">
-                <span class="italic">{{ productoMenorStock.nombre }}</span>:
-                <span class="font-bold text-mauve">{{ productoMenorStock.stock }} uds</span> disponibles
-              </p>
-              <p v-else class="text-sm font-medium text-lavanda-medio">
-                Agrega productos en el Catálogo
-              </p>
-            </div>
-
-            <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
-              <p class="text-xs font-bold text-lavanda-medio mb-1">
-                <i class="pi pi-chart-bar" aria-hidden="true"></i> Actividad
-              </p>
-              <p v-if="dashStore.stats.pedidos_mes > 0" class="text-sm font-medium">
-                {{ dashStore.stats.pedidos_mes }} pedidos este mes por
-                <span class="font-bold text-mauve">${{ formatMoney(dashStore.stats.ventas_mes) }}</span>
-              </p>
-              <p v-else class="text-sm font-medium text-lavanda-medio">
-                Sin pedidos este mes
-              </p>
-            </div>
-          </div>
+      <!-- ================== Resumen compacto ================== -->
+      <div class="bg-navy/95 rounded-lg text-white flex flex-col sm:flex-row gap-0 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
+        <div class="flex-1 flex items-center gap-2 px-4 py-2.5">
+          <i class="pi pi-box text-mauve text-sm" aria-hidden="true"></i>
+          <span class="text-[11px] uppercase tracking-wide text-lavanda-medio">Inventario:</span>
+          <span v-if="productoMenorStock" class="text-xs font-medium">
+            {{ productoMenorStock.nombre }} —
+            <span class="font-bold text-mauve">{{ productoMenorStock.stock }} uds</span>
+          </span>
+          <span v-else class="text-xs text-lavanda-medio/70">Agrega productos</span>
+        </div>
+        <div class="flex-1 flex items-center gap-2 px-4 py-2.5">
+          <i class="pi pi-chart-bar text-mauve text-sm" aria-hidden="true"></i>
+          <span class="text-[11px] uppercase tracking-wide text-lavanda-medio">Actividad:</span>
+          <span v-if="dashStore.stats.pedidos_mes > 0" class="text-xs font-medium">
+            {{ dashStore.stats.pedidos_mes }} pedidos · <span class="font-bold text-mauve">${{ formatMoney(dashStore.stats.ventas_mes) }}</span>
+          </span>
+          <span v-else class="text-xs text-lavanda-medio/70">Sin pedidos este mes</span>
         </div>
       </div>
 

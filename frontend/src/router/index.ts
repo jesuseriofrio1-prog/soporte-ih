@@ -21,11 +21,10 @@ const routes = [
         component: () => import('../views/PedidosView.vue'),
         meta: { title: 'Envíos / Pedidos' },
       },
+      // Redirect legacy /novedades al filtro chip de Pedidos
       {
         path: 'novedades',
-        name: 'novedades',
-        component: () => import('../views/NovedadesView.vue'),
-        meta: { title: 'Novedades' },
+        redirect: '/pedidos?filtro=novedades',
       },
       {
         path: 'catalogo',

@@ -251,12 +251,15 @@ function aplicarFiltroProducto() {
 // Chips de antigüedad (cliente-side, sobre la lista ya cargada)
 // ─────────────────────────────────────────────
 
-type AntiguedadKey = 'todos' | 'hoy' | '1d' | '2d' | '3plus' | 'aplazados'
+type AntiguedadKey = 'todos' | 'hoy' | '1d' | '2d' | '3plus' | 'aplazados' | 'novedades'
 
 const filtroAntiguedad = ref<AntiguedadKey>('todos')
 
 // Estados "activos" = todavía no cerrados (aún requieren acción)
 const ESTADOS_ACTIVOS = ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION'] as const
+
+// Estados considerados "novedad" — requieren atención del operador
+const ESTADOS_NOVEDAD = ['NOVEDAD', 'NO_ENTREGADO'] as const
 
 function diasDesde(iso: string): number {
   const ms = Date.now() - new Date(iso).getTime()
@@ -266,6 +269,12 @@ function diasDesde(iso: string): number {
 function matchesAntiguedad(p: Pedido, filtro: AntiguedadKey): boolean {
   if (filtro === 'todos') return true
   if (filtro === 'aplazados') return p.retencion_inicio !== null
+
+  if (filtro === 'novedades') {
+    const enNovedad = ESTADOS_NOVEDAD.includes(p.estado as typeof ESTADOS_NOVEDAD[number])
+    const enRiesgo = p.estado === 'RETIRO_EN_AGENCIA' && (p.retencion_inicio !== null || (p.dias_en_agencia ?? 0) >= 6)
+    return enNovedad || enRiesgo
+  }
 
   // El resto de chips solo aplica a pedidos activos
   if (!ESTADOS_ACTIVOS.includes(p.estado as typeof ESTADOS_ACTIVOS[number])) return false
@@ -283,12 +292,13 @@ function matchesAntiguedad(p: Pedido, filtro: AntiguedadKey): boolean {
 const chipsAntiguedad = computed(() => {
   const countFor = (k: AntiguedadKey) => pedidosStore.pedidos.filter((p) => matchesAntiguedad(p, k)).length
   return [
-    { key: 'todos' as const,     label: 'Todos',          count: pedidosStore.pedidos.length },
-    { key: 'hoy' as const,       label: 'Nuevos hoy',     count: countFor('hoy') },
-    { key: '1d' as const,        label: 'Pendientes 1d',  count: countFor('1d') },
-    { key: '2d' as const,        label: 'Pendientes 2d',  count: countFor('2d') },
-    { key: '3plus' as const,     label: 'Pendientes +3d', count: countFor('3plus') },
-    { key: 'aplazados' as const, label: 'Aplazados',      count: countFor('aplazados') },
+    { key: 'todos' as const,     label: 'Todos',          count: pedidosStore.pedidos.length,  alerta: false },
+    { key: 'novedades' as const, label: 'Novedades',      count: countFor('novedades'),        alerta: true },
+    { key: 'hoy' as const,       label: 'Nuevos hoy',     count: countFor('hoy'),              alerta: false },
+    { key: '1d' as const,        label: 'Pendientes 1d',  count: countFor('1d'),               alerta: false },
+    { key: '2d' as const,        label: 'Pendientes 2d',  count: countFor('2d'),               alerta: false },
+    { key: '3plus' as const,     label: 'Pendientes +3d', count: countFor('3plus'),            alerta: false },
+    { key: 'aplazados' as const, label: 'Aplazados',      count: countFor('aplazados'),        alerta: false },
   ]
 })
 
@@ -535,75 +545,97 @@ onMounted(() => {
     abrirModal()
     routerInstance.replace({ path: '/pedidos' })
   }
+
+  // Si viene con ?filtro=novedades (redirect desde /novedades o click en
+  // dashboard), activar el chip correspondiente.
+  const filtroParam = route.query.filtro
+  if (typeof filtroParam === 'string') {
+    const valid: AntiguedadKey[] = ['todos', 'hoy', '1d', '2d', '3plus', 'aplazados', 'novedades']
+    if ((valid as string[]).includes(filtroParam)) {
+      filtroAntiguedad.value = filtroParam as AntiguedadKey
+    }
+  }
 })
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Chips de antigüedad -->
-    <div class="bg-white p-3 rounded-xl shadow-sm border border-lavanda-medio flex flex-wrap gap-2">
-      <button
-        v-for="chip in chipsAntiguedad"
-        :key="chip.key"
-        @click="filtroAntiguedad = chip.key"
-        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold transition border"
-        :class="filtroAntiguedad === chip.key
-          ? 'bg-mauve text-white border-mauve shadow-sm'
-          : 'bg-white text-navy border-lavanda-medio hover:bg-lavanda/30'"
-      >
-        <span>{{ chip.label }}</span>
-        <span
-          class="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 text-[11px] rounded-full"
-          :class="filtroAntiguedad === chip.key ? 'bg-white/25 text-white' : 'bg-lavanda/60 text-navy/70'"
+    <!-- Barra única: chips + filtros secundarios + acciones -->
+    <div class="bg-white rounded-xl shadow-sm border border-lavanda-medio">
+      <!-- Chips de vista rápida (primer nivel) -->
+      <div class="px-3 pt-3 pb-2 flex flex-wrap gap-2 border-b border-lavanda-medio/60">
+        <button
+          v-for="chip in chipsAntiguedad"
+          :key="chip.key"
+          @click="filtroAntiguedad = chip.key"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold transition border"
+          :class="[
+            filtroAntiguedad === chip.key
+              ? (chip.alerta && chip.count > 0
+                  ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                  : 'bg-mauve text-white border-mauve shadow-sm')
+              : (chip.alerta && chip.count > 0
+                  ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                  : 'bg-white text-navy border-lavanda-medio hover:bg-lavanda/30')
+          ]"
         >
-          {{ chip.count }}
-        </span>
-      </button>
-    </div>
-
-    <!-- Barra de filtros -->
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-lavanda-medio flex flex-wrap gap-4 items-center justify-between">
-      <div class="flex items-center gap-3 flex-wrap">
-        <i class="pi pi-filter text-mauve"></i>
-        <span class="font-bold text-navy">Filtrar:</span>
-
-        <select
-          v-model="filtroProducto"
-          @change="aplicarFiltroProducto"
-          class="p-2 bg-lavanda/50 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-navy font-medium min-w-[200px]"
-        >
-          <option value="">Todos los productos</option>
-          <option v-for="p in productosStore.productos" :key="p.id" :value="p.id">
-            {{ p.nombre }}
-          </option>
-        </select>
-
-        <select
-          v-model="filtroEstado"
-          @change="aplicarFiltroEstado"
-          class="p-2 bg-lavanda/50 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-navy font-medium min-w-[180px]"
-        >
-          <option v-for="e in estadosDisponibles" :key="e.value" :value="e.value">
-            {{ e.label }}
-          </option>
-        </select>
+          <i v-if="chip.alerta && chip.count > 0" class="pi pi-exclamation-triangle text-xs" aria-hidden="true"></i>
+          <span>{{ chip.label }}</span>
+          <span
+            class="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 text-[11px] rounded-full"
+            :class="[
+              filtroAntiguedad === chip.key
+                ? 'bg-white/25 text-white'
+                : (chip.alerta && chip.count > 0 ? 'bg-red-200 text-red-800' : 'bg-lavanda/60 text-navy/70')
+            ]"
+          >
+            {{ chip.count }}
+          </span>
+        </button>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button
-          @click="sincronizarServientrega"
-          :disabled="sincronizando"
-          class="bg-navy text-white px-4 py-2 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm disabled:opacity-50"
-        >
-          <i :class="sincronizando ? 'pi pi-spin pi-spinner' : 'pi pi-sync'" aria-hidden="true"></i>
-          <span class="hidden md:inline">{{ sincronizando ? 'Sincronizando...' : 'Sincronizar' }}</span>
-        </button>
-        <button
-          @click="abrirModal"
-          class="bg-mauve text-white px-5 py-2 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
-        >
-          <i class="pi pi-plus"></i> Nuevo Pedido
-        </button>
+      <!-- Filtros secundarios + acciones (segunda fila) -->
+      <div class="px-3 py-2.5 flex flex-wrap gap-3 items-center justify-between">
+        <div class="flex items-center gap-2 flex-wrap">
+          <i class="pi pi-filter text-mauve text-sm" aria-hidden="true"></i>
+          <select
+            v-model="filtroProducto"
+            @change="aplicarFiltroProducto"
+            class="px-3 py-1.5 text-sm bg-lavanda/40 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-navy font-medium"
+          >
+            <option value="">Todos los productos</option>
+            <option v-for="p in productosStore.productos" :key="p.id" :value="p.id">
+              {{ p.nombre }}
+            </option>
+          </select>
+
+          <select
+            v-model="filtroEstado"
+            @change="aplicarFiltroEstado"
+            class="px-3 py-1.5 text-sm bg-lavanda/40 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-navy font-medium"
+          >
+            <option v-for="e in estadosDisponibles" :key="e.value" :value="e.value">
+              {{ e.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            @click="sincronizarServientrega"
+            :disabled="sincronizando"
+            class="bg-navy text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm disabled:opacity-50"
+          >
+            <i :class="sincronizando ? 'pi pi-spin pi-spinner' : 'pi pi-sync'" aria-hidden="true"></i>
+            <span class="hidden md:inline">{{ sincronizando ? 'Sincronizando...' : 'Sincronizar' }}</span>
+          </button>
+          <button
+            @click="abrirModal"
+            class="bg-mauve text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
+          >
+            <i class="pi pi-plus"></i> Nuevo Pedido
+          </button>
+        </div>
       </div>
     </div>
 

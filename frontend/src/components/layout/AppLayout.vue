@@ -70,12 +70,13 @@ const pageTitle = computed(() => (route.meta.title as string) || 'Soporte IH')
 
 const navItems = computed(() => [
   { name: 'Dashboard', route: '/dashboard', icon: 'pi pi-chart-line', badge: 0 },
-  { name: 'Envíos / Pedidos', route: '/pedidos', icon: 'pi pi-truck', badge: 0 },
   {
-    name: 'Novedades',
-    route: '/novedades',
-    icon: 'pi pi-exclamation-triangle',
-    badge: dashStore.stats?.novedades || 0,
+    // El badge combina novedades + riesgo de devolución (todo lo que
+    // aparece en el chip "Novedades" dentro de la lista de pedidos)
+    name: 'Envíos / Pedidos',
+    route: '/pedidos',
+    icon: 'pi pi-truck',
+    badge: (dashStore.stats?.novedades || 0) + (dashStore.stats?.riesgo_devolucion || 0),
   },
   { name: 'Catálogo', route: '/catalogo', icon: 'pi pi-box', badge: 0 },
   { name: 'Clientes', route: '/clientes', icon: 'pi pi-users', badge: 0 },
@@ -219,16 +220,6 @@ const storageBarColor = computed(() => {
           </span>
         </div>
 
-        <div class="flex items-center space-x-3">
-          <button
-            @click="navigateTo('/pedidos?nuevo=true')"
-            class="text-white px-5 py-2 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
-            :style="{ backgroundColor: tiendaStore.tiendaActiva?.color_secundario || '#C49BC2' }"
-          >
-            <i class="pi pi-plus"></i>
-            <span class="hidden sm:inline">Nuevo Pedido</span>
-          </button>
-        </div>
       </header>
 
       <!-- Contenido -->
