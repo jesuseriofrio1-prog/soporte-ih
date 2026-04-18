@@ -9,12 +9,16 @@ export class NotificationsService {
     private readonly firebaseAdmin: FirebaseAdminService,
   ) {}
 
-  /** Registrar un token FCM (upsert para evitar duplicados) */
-  async registerToken(token: string) {
+  /**
+   * Registrar un token FCM asociado a una tienda. Upsert por (token):
+   * si el mismo navegador se loguea en otra tienda, el token se
+   * reasigna a la nueva.
+   */
+  async registerToken(token: string, tiendaId: string) {
     const { data, error } = await this.supabase
       .getClient()
       .from('fcm_tokens')
-      .upsert({ token }, { onConflict: 'token' })
+      .upsert({ token, tienda_id: tiendaId }, { onConflict: 'token' })
       .select()
       .single();
 
@@ -22,18 +26,19 @@ export class NotificationsService {
     return data;
   }
 
-  /** Obtener todos los tokens registrados */
-  async getAllTokens(): Promise<string[]> {
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('fcm_tokens')
-      .select('token');
-
+  /**
+   * Obtener tokens registrados. Si viene `tiendaId`, filtra por esa
+   * tienda; si no, devuelve todos (fallback para llamadas legacy).
+   */
+  async getAllTokens(tiendaId?: string): Promise<string[]> {
+    let q = this.supabase.getClient().from('fcm_tokens').select('token');
+    if (tiendaId) q = q.eq('tienda_id', tiendaId);
+    const { data, error } = await q;
     if (error) throw error;
     return (data || []).map((row) => row.token);
   }
 
-  /** Revisa pedidos en riesgo y envía push notification */
+  /** Revisa pedidos en riesgo y envía push notification. */
   async checkAlertas(tienda_id?: string) {
     // Buscar pedidos en riesgo de devolución
     let query = this.supabase
@@ -57,11 +62,15 @@ export class NotificationsService {
       return { alertas: 0, notificaciones: { success: 0, failure: 0 } };
     }
 
-    // Obtener todos los tokens registrados
-    const tokens = await this.getAllTokens();
+    // Solo notifica a los tokens de la misma tienda: admin de Skinna
+    // no recibe alertas de MaxiHogar y viceversa.
+    const tokens = await this.getAllTokens(tienda_id);
 
     if (tokens.length === 0) {
-      return { alertas: cantidad, notificaciones: { success: 0, failure: 0, reason: 'Sin tokens registrados' } };
+      return {
+        alertas: cantidad,
+        notificaciones: { success: 0, failure: 0, reason: 'Sin tokens registrados' },
+      };
     }
 
     // Enviar push

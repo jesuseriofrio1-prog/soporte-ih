@@ -43,11 +43,20 @@ export class WebhooksController {
     return { ok: true, ...result };
   }
 
-  /** Listar últimos N eventos (para la UI de integraciones). */
+  /**
+   * Listar últimos N eventos (para la UI de integraciones).
+   * Si viene `tienda_id`, filtra por esa tienda.
+   */
   @Get('rocket/logs')
-  async listarLogs(@Query('limit') limit?: string) {
+  async listarLogs(
+    @Query('limit') limit?: string,
+    @Query('tienda_id') tiendaId?: string,
+  ) {
     const n = limit ? parseInt(limit, 10) : 50;
-    return this.webhooks.listarLogs(Number.isFinite(n) ? n : 50);
+    return this.webhooks.listarLogs(
+      Number.isFinite(n) ? n : 50,
+      tiendaId && tiendaId.trim() ? tiendaId.trim() : undefined,
+    );
   }
 
   private verificarSecret(secret: string) {

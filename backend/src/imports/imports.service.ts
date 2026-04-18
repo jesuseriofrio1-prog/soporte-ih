@@ -283,8 +283,8 @@ export class ImportsService {
       .select('id')
       .eq('telefono', telefonoNorm)
       .eq('tienda_id', tiendaId)
-      .single();
-    if (errBusca && errBusca.code !== 'PGRST116') throw errBusca;
+      .maybeSingle();
+    if (errBusca) throw errBusca;
 
     let clienteId: string;
     if (clienteExistente) {
@@ -447,12 +447,29 @@ export class ImportsService {
     return data;
   }
 
-  async eliminarAlias(aliasId: string) {
-    const { error } = await this.supabase
-      .getClient()
+  /**
+   * Elimina un alias. Requiere la tienda para validar ownership —
+   * previene que un usuario borre aliases de otra tienda aunque
+   * conozca el UUID del alias.
+   */
+  async eliminarAlias(aliasId: string, tiendaId: string) {
+    const db = this.supabase.getClient();
+
+    // 1) Verificar que el alias exista y pertenezca a la tienda.
+    const { data: alias, error: errFind } = await db
       .from('producto_aliases')
-      .delete()
-      .eq('id', aliasId);
+      .select('id, tienda_id')
+      .eq('id', aliasId)
+      .maybeSingle();
+    if (errFind) throw errFind;
+    if (!alias) {
+      throw new BadRequestException('Alias no encontrado');
+    }
+    if (alias.tienda_id !== tiendaId) {
+      throw new BadRequestException('El alias no pertenece a la tienda indicada');
+    }
+
+    const { error } = await db.from('producto_aliases').delete().eq('id', aliasId);
     if (error) throw error;
     return { ok: true };
   }

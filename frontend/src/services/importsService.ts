@@ -68,12 +68,16 @@ const importsService = {
     return data
   },
 
-  async eliminarAlias(aliasId: string) {
-    await api.delete(`/imports/producto-aliases/${aliasId}`)
+  async eliminarAlias(aliasId: string, tiendaId: string) {
+    await api.delete(
+      `/imports/producto-aliases/${aliasId}?tienda_id=${encodeURIComponent(tiendaId)}`,
+    )
   },
 
-  async listWebhookLogs(limit = 50): Promise<WebhookLog[]> {
-    const { data } = await api.get(`/webhooks/rocket/logs?limit=${limit}`)
+  async listWebhookLogs(tiendaId: string, limit = 50): Promise<WebhookLog[]> {
+    const { data } = await api.get(
+      `/webhooks/rocket/logs?limit=${limit}&tienda_id=${encodeURIComponent(tiendaId)}`,
+    )
     return data
   },
 }

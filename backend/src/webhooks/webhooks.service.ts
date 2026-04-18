@@ -57,6 +57,7 @@ export class WebhooksService {
 
     let result: WebhookProcessResult;
     let pedidoIdLog: string | null = null;
+    let tiendaIdLog: string | null = null;
     let errorMensaje: string | null = null;
 
     try {
@@ -71,8 +72,10 @@ export class WebhooksService {
           mensaje: 'Payload sin estado (estado/status/nuevo_estado)',
         };
       } else {
-        result = await this.aplicarCambioEstado(externalOrderId, estadoRaw, payload);
-        if (result.pedido_id) pedidoIdLog = result.pedido_id;
+        const procesado = await this.aplicarCambioEstado(externalOrderId, estadoRaw, payload);
+        result = procesado.result;
+        pedidoIdLog = procesado.result.pedido_id ?? null;
+        tiendaIdLog = procesado.tiendaId;
       }
     } catch (err) {
       errorMensaje = err instanceof Error ? err.message : 'Error desconocido';
@@ -87,6 +90,7 @@ export class WebhooksService {
       status: result.status,
       payload,
       pedidoId: pedidoIdLog,
+      tiendaId: tiendaIdLog,
       errorMensaje,
     });
 
@@ -110,7 +114,7 @@ export class WebhooksService {
     externalOrderId: string,
     estadoRaw: string,
     payload: RocketWebhookPayload,
-  ): Promise<WebhookProcessResult> {
+  ): Promise<{ result: WebhookProcessResult; tiendaId: string | null }> {
     const db = this.supabase.getClient();
 
     const { data: pedido, error } = await db
@@ -123,17 +127,25 @@ export class WebhooksService {
     if (error) throw error;
     if (!pedido) {
       return {
-        status: 'pedido_no_encontrado',
-        mensaje: `No hay pedido con external_order_id=${externalOrderId}. Debe importarse el Excel de Rocket primero.`,
+        result: {
+          status: 'pedido_no_encontrado',
+          mensaje: `No hay pedido con external_order_id=${externalOrderId}. Debe importarse el Excel de Rocket primero.`,
+        },
+        tiendaId: null,
       };
     }
+
+    const tiendaId = pedido.tienda_id as string;
 
     const mapping = mapEstadoRocket(estadoRaw);
     if (!mapping) {
       return {
-        status: 'estado_no_reconocido',
-        pedido_id: pedido.id,
-        mensaje: `Estado "${estadoRaw}" no está en el mapeo de Rocket→Soporte IH`,
+        result: {
+          status: 'estado_no_reconocido',
+          pedido_id: pedido.id,
+          mensaje: `Estado "${estadoRaw}" no está en el mapeo de Rocket→Soporte IH`,
+        },
+        tiendaId,
       };
     }
 
@@ -156,19 +168,18 @@ export class WebhooksService {
 
     // Enlace oportunista: si existe solicitud esperando este rocket_order_id
     // la vinculamos al pedido, incluso si no hubo cambios de estado esta vez.
-    await this.solicitudes.enlazarDesdePedido(
-      pedido.tienda_id as string,
-      externalOrderId,
-      pedido.id,
-    );
+    await this.solicitudes.enlazarDesdePedido(tiendaId, externalOrderId, pedido.id);
 
     if (Object.keys(patch).length === 0) {
       return {
-        status: 'ok',
-        pedido_id: pedido.id,
-        estado_anterior: estadoAnterior,
-        estado_nuevo: nuevoEstado,
-        mensaje: 'Sin cambios',
+        result: {
+          status: 'ok',
+          pedido_id: pedido.id,
+          estado_anterior: estadoAnterior,
+          estado_nuevo: nuevoEstado,
+          mensaje: 'Sin cambios',
+        },
+        tiendaId,
       };
     }
 
@@ -186,10 +197,13 @@ export class WebhooksService {
     }
 
     return {
-      status: 'ok',
-      pedido_id: pedido.id,
-      estado_anterior: estadoAnterior,
-      estado_nuevo: nuevoEstado,
+      result: {
+        status: 'ok',
+        pedido_id: pedido.id,
+        estado_anterior: estadoAnterior,
+        estado_nuevo: nuevoEstado,
+      },
+      tiendaId,
     };
   }
 
@@ -199,6 +213,7 @@ export class WebhooksService {
     status: string;
     payload: unknown;
     pedidoId: string | null;
+    tiendaId: string | null;
     errorMensaje: string | null;
   }) {
     try {
@@ -209,6 +224,7 @@ export class WebhooksService {
         status: params.status,
         payload: params.payload as object,
         pedido_id: params.pedidoId,
+        tienda_id: params.tiendaId,
         error_mensaje: params.errorMensaje,
       });
     } catch (err) {
@@ -217,14 +233,20 @@ export class WebhooksService {
     }
   }
 
-  async listarLogs(limit = 50) {
-    const { data, error } = await this.supabase
+  /**
+   * Lista los últimos eventos recibidos. Si `tiendaId` viene, filtra por
+   * esa tienda. Si no, devuelve todo (útil para debug/admin global).
+   */
+  async listarLogs(limit = 50, tiendaId?: string) {
+    let q = this.supabase
       .getClient()
       .from('webhook_logs')
-      .select('id, external_source, event_type, external_order_id, status, pedido_id, error_mensaje, created_at')
+      .select('id, external_source, event_type, external_order_id, status, pedido_id, tienda_id, error_mensaje, created_at')
       .eq('external_source', 'rocket')
       .order('created_at', { ascending: false })
       .limit(Math.min(Math.max(limit, 1), 200));
+    if (tiendaId) q = q.eq('tienda_id', tiendaId);
+    const { data, error } = await q;
     if (error) throw error;
     return data ?? [];
   }

@@ -42,11 +42,12 @@ const pendientes = ref<
 >([])
 
 async function cargarWebhookLogs() {
+  if (!tiendaStore.tiendaActiva) return
   webhookLogsLoading.value = true
   try {
-    webhookLogs.value = await importsService.listWebhookLogs(30)
-  } catch {
-    // silencioso
+    webhookLogs.value = await importsService.listWebhookLogs(tiendaStore.tiendaActiva.id, 30)
+  } catch (err) {
+    console.warn('[Integraciones] No se pudieron cargar webhook logs:', err)
   } finally {
     webhookLogsLoading.value = false
   }
@@ -76,6 +77,7 @@ watch(
   () => tiendaStore.tiendaActivaId,
   () => {
     cargarAliases()
+    cargarWebhookLogs()
     lastResult.value = null
     pendientes.value = []
   },
@@ -149,8 +151,9 @@ async function guardarMapping(idx: number) {
 }
 
 async function eliminarAliasExistente(alias: ProductoAlias) {
+  if (!tiendaStore.tiendaActiva) return
   try {
-    await importsService.eliminarAlias(alias.id)
+    await importsService.eliminarAlias(alias.id, tiendaStore.tiendaActiva.id)
     toast.success('Alias eliminado')
     cargarAliases()
   } catch {

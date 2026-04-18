@@ -68,7 +68,13 @@ export class ImportsController {
   }
 
   @Delete('producto-aliases/:id')
-  eliminarAlias(@Param('id', ParseUUIDPipe) id: string) {
-    return this.imports.eliminarAlias(id);
+  eliminarAlias(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('tienda_id') tiendaId: string,
+  ) {
+    if (!tiendaId || !UUID_REGEX.test(tiendaId)) {
+      throw new BadRequestException('tienda_id es requerido y debe ser un UUID válido');
+    }
+    return this.imports.eliminarAlias(id, tiendaId);
   }
 }

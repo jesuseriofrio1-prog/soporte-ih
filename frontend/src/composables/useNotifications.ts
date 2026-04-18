@@ -5,11 +5,24 @@ import api from '../services/api'
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || ''
 
-/** Pide permiso de notificaciones, obtiene FCM token y lo registra en el backend */
-export async function requestPermission() {
+/**
+ * Clave de localStorage que recuerda con qué tienda se registró el
+ * token actual. Si el admin cambia de tienda activa volvemos a registrar
+ * para que las alertas de la nueva tienda sí lleguen a este navegador.
+ */
+const FCM_REGISTERED_TIENDA_KEY = 'soporte_ih_fcm_registered_tienda'
+
+/**
+ * Pide permiso de notificaciones, obtiene FCM token y lo registra en el
+ * backend asociado a la tienda activa. Si el mismo navegador cambia de
+ * tienda, el token se reasigna (upsert onConflict: token en el backend).
+ */
+export async function requestPermission(tiendaId: string) {
   try {
-    // Verificar si ya se registró
-    if (localStorage.getItem('soporte_ih_fcm_registered') === 'true') return
+    if (!tiendaId) return
+
+    // Si ya registramos este tab con esta tienda, evita re-llamar al backend.
+    if (localStorage.getItem(FCM_REGISTERED_TIENDA_KEY) === tiendaId) return
 
     const messaging = await getMessagingInstance()
     if (!messaging) return
@@ -20,11 +33,8 @@ export async function requestPermission() {
     const token = await getToken(messaging, { vapidKey: VAPID_KEY })
     if (!token) return
 
-    // Guardar y registrar en backend
-    localStorage.setItem('soporte_ih_fcm_token', token)
-
-    await api.post('/notifications/register-token', { token })
-    localStorage.setItem('soporte_ih_fcm_registered', 'true')
+    await api.post('/notifications/register-token', { token, tienda_id: tiendaId })
+    localStorage.setItem(FCM_REGISTERED_TIENDA_KEY, tiendaId)
   } catch (error) {
     console.error('Error al registrar notificaciones:', error)
   }

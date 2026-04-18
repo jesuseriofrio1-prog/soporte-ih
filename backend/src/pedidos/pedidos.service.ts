@@ -147,9 +147,9 @@ export class PedidosService {
       .select('id')
       .eq('telefono', telefonoNorm)
       .eq('tienda_id', dto.tienda_id)
-      .single();
+      .maybeSingle();
 
-    if (errBusca && errBusca.code !== 'PGRST116') {
+    if (errBusca) {
       throw new BadRequestException('Error al buscar cliente');
     }
 

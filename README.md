@@ -118,7 +118,7 @@ Todos bajo `/api`, con validación vía `class-validator` y `ValidationPipe` glo
 | GET / POST / PATCH / DELETE | `/pedidos[/:id]` | Pedidos + estado + retención |
 | GET | `/dashboard/{stats,ventas-semana,canales,storage}` | KPIs del panel |
 | POST | `/tracking/sincronizar?tienda_id=…` | Scraping de Servientrega |
-| POST | `/notifications/{register-token,send-alerta}` | FCM |
+| POST | `/notifications/{register-token,check-alertas}` | FCM |
 
 ### Integración con Rocket Ecuador
 
@@ -175,14 +175,34 @@ Ver `backend/src/imports/producto-matcher.ts`.
 
 ## Autenticación
 
-El backend tiene `AuthModule` con login vía Supabase Auth y `JwtAuthGuard`, pero **no está registrado como `APP_GUARD` global**. Todas las rutas responden sin token. Es intencional hasta decidir el modelo de acceso del panel.
+Auth global activada con **cookies HttpOnly + CSRF double-submit**.
 
-Para reactivarlo:
-1. Registrar `APP_GUARD` con `JwtAuthGuard` en `app.module.ts`.
-2. Añadir ruta `/login` en `frontend/src/router/index.ts` + `beforeEach` que valide token.
-3. Añadir request interceptor en `frontend/src/services/api.ts` para inyectar `Authorization: Bearer <token>`.
+Flujo:
+1. `POST /auth/login` valida contra Supabase Auth y setea:
+   - `sih_session` — HttpOnly, contiene el JWT (inaccesible desde JS).
+   - `sih_csrf` — legible por JS, para el patrón doble-submit.
+2. `JwtAuthGuard` está registrado como `APP_GUARD` global (`app.module.ts`).
+   Todas las rutas requieren JWT salvo las marcadas `@Public()`.
+3. En mutaciones (POST/PUT/PATCH/DELETE), el guard valida que
+   `X-CSRF-Token` header coincida con `sih_csrf` cookie (timing-safe).
+4. `GET /auth/me` devuelve `{id, email}` — el frontend lo usa para saber
+   si sigue logueado sin guardar nada en localStorage.
+5. `POST /auth/logout` limpia ambas cookies.
 
-Los endpoints `/public/*` están marcados con `@Public()` y seguirán funcionando sin token.
+Rate-limit login: **20 intentos / 5 min por IP**.
+
+Rutas marcadas `@Public()` (sin token):
+- `POST /auth/login`, `POST /auth/logout`
+- `GET /health`
+- `POST /webhooks/rocket/:secret` (secret comparado en tiempo constante)
+- `GET /public/tiendas/:slug[/productos/:productoSlug]` (catálogo y form)
+- `POST /public/tiendas/:slug/solicitudes`
+
+El frontend:
+- `services/api.ts` con `withCredentials: true` + interceptor que añade
+  `X-CSRF-Token` en mutaciones. En 401 redirige a `/login?redirect=`.
+- Router `beforeEach` cachea la sesión con `/auth/me` una vez por carga;
+  las rutas `meta.public` puras (formularios `/p/:slug`) se saltan el guard.
 
 ## Deploy en Vercel (unificado)
 

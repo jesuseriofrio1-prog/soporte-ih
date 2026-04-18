@@ -52,9 +52,9 @@ export class ProductosService {
       .select('id')
       .eq('slug', dto.slug)
       .eq('tienda_id', dto.tienda_id)
-      .single();
+      .maybeSingle();
 
-    if (errBusca && errBusca.code !== 'PGRST116') {
+    if (errBusca) {
       throw errBusca;
     }
 

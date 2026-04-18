@@ -17,7 +17,7 @@ const messaging = firebase.messaging()
 
 // Manejo de notificaciones en background
 messaging.onBackgroundMessage((payload) => {
-  const titulo = payload.notification?.title || 'SKINNA'
+  const titulo = payload.notification?.title || 'Soporte IH'
   const opciones = {
     body: payload.notification?.body || '',
     icon: '/favicon.ico',

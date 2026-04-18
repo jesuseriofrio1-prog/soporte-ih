@@ -35,16 +35,19 @@ async function cargarSolicitudesStats() {
   try {
     const s = await solicitudesService.stats(tiendaStore.tiendaActivaId)
     solicitudesAbiertas.value = s.total_abiertas
-  } catch {
-    // silencioso
+  } catch (err) {
+    // No es crítico (sólo afecta el badge del sidebar), pero logueamos
+    // para que el bug no quede invisible si el endpoint cambia.
+    console.warn('[AppLayout] No se pudieron cargar stats de solicitudes:', err)
   }
 }
 
 async function loadStorage() {
   try {
     storage.value = await dashboardService.getStorageInfo()
-  } catch {
-    // Silencioso
+  } catch (err) {
+    // No crítico (sólo afecta el pill del sidebar), pero logueamos.
+    console.warn('[AppLayout] No se pudo cargar info de storage:', err)
   }
 }
 
@@ -64,13 +67,18 @@ onMounted(async () => {
   // valor no cambia tras fetchTiendas y el dashboard quedaba en blanco.
   recargarDatosTienda()
   loadStorage()
-  requestPermission().catch(() => {})
+  if (tiendaStore.tiendaActivaId) {
+    requestPermission(tiendaStore.tiendaActivaId).catch(() => {})
+  }
   onMessageReceived().catch(() => {})
 })
 
-// Cuando cambia la tienda activa manualmente, recargar datos y colores
-watch(() => tiendaStore.tiendaActivaId, () => {
+// Cuando cambia la tienda activa, recargar datos + reasignar FCM token.
+watch(() => tiendaStore.tiendaActivaId, (tiendaId) => {
   recargarDatosTienda()
+  if (tiendaId) {
+    requestPermission(tiendaId).catch(() => {})
+  }
 })
 
 function aplicarColoresTienda() {

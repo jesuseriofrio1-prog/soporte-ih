@@ -118,7 +118,7 @@ describe('SolicitudesService — endpoints públicos', () => {
 
     it('no expone campos sensibles del producto (stock, tienda_id, activo)', async () => {
       const result = await service.tiendaConCatalogo('skinna');
-      const prod = result.catalogo[0] as Record<string, unknown>;
+      const prod = result.catalogo[0] as unknown as Record<string, unknown>;
       expect(prod).not.toHaveProperty('stock');
       expect(prod).not.toHaveProperty('tienda_id');
       expect(prod).not.toHaveProperty('activo');
