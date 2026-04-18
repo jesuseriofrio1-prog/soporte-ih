@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app'
+import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
 const firebaseConfig = {
@@ -10,21 +10,28 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-const app = initializeApp(firebaseConfig)
+// Inicializa Firebase solo si hay configuración válida. Si las env vars
+// VITE_FIREBASE_* no están seteadas, todas las funciones de push quedan
+// como no-op y la app funciona sin ellas.
+const firebaseEnabled = !!firebaseConfig.apiKey && !!firebaseConfig.projectId
 
-// Messaging solo si el browser lo soporta
+const app: FirebaseApp | null = firebaseEnabled ? initializeApp(firebaseConfig) : null
+
 let messaging: ReturnType<typeof getMessaging> | null = null
 
-isSupported().then((supported) => {
-  if (supported) {
-    messaging = getMessaging(app)
-  }
-})
+if (app) {
+  isSupported().then((supported) => {
+    if (supported) {
+      messaging = getMessaging(app)
+    }
+  })
+}
 
 export { app, messaging }
 
-/** Obtener messaging de forma async (espera a que isSupported resuelva) */
+/** Obtener messaging de forma async. Devuelve null si Firebase no está configurado. */
 export async function getMessagingInstance() {
+  if (!app) return null
   const supported = await isSupported()
   if (!supported) return null
   return getMessaging(app)
