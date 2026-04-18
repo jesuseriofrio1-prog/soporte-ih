@@ -1,12 +1,20 @@
 import {
   IsString,
   IsNotEmpty,
-  IsUUID,
   IsNumber,
   IsEnum,
   IsOptional,
   Min,
+  Matches,
 } from 'class-validator';
+
+/**
+ * Regex para UUID genérico (no exige versión v4). Aceptamos el formato de UUID
+ * canónico sin verificar el dígito de versión porque el seed de la tienda por
+ * defecto usa `00000000-0000-0000-0000-000000000001` (no es v4).
+ */
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export enum TipoEntrega {
   DOMICILIO = 'DOMICILIO',
@@ -49,6 +57,6 @@ export class CreatePedidoDto {
   @IsString()
   notas?: string;
 
-  @IsUUID('4', { message: 'tienda_id debe ser un UUID válido' })
+  @Matches(UUID_REGEX, { message: 'tienda_id debe ser un UUID válido' })
   tienda_id: string;
 }

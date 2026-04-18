@@ -49,7 +49,9 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(EMAIL_KEY)
     localStorage.removeItem(FCM_KEY)
-    router.push('/login')
+    // Auth está deshabilitada por decisión de producto — no hay ruta /login
+    // registrada. Si se reactiva el flujo, añadir la ruta y volver a apuntar.
+    router.push('/')
   }
 
   /** Verifica que el token guardado siga siendo válido */
