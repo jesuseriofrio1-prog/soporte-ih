@@ -42,7 +42,7 @@ export class SolicitudesService {
       .from('tiendas')
       .select('id, slug, nombre, logo_url, color_primario, color_secundario, color_fondo')
       .eq('slug', slug)
-      .eq('estado', 'activa')
+      .eq('estado', true)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException(`Tienda "${slug}" no existe o está inactiva`);
