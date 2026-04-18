@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import solicitudesService, {
   type TiendaPublica,
@@ -7,6 +7,12 @@ import solicitudesService, {
 } from '../services/solicitudesService'
 import referidosService from '../services/referidosService'
 import MapPicker from '../components/public/MapPicker.vue'
+import {
+  PROVINCIAS_EC,
+  CANTONES_POR_PROVINCIA,
+  geocodeQuery,
+  type ProvinciaEC,
+} from '../data/ecuador-geo'
 
 const route = useRoute()
 
@@ -39,41 +45,53 @@ const form = ref({
   producto_id: '' as string,
 })
 
-// Coordenadas elegidas en el map picker. Null si el cliente solo escribió.
+// Coordenadas elegidas en el map picker. Obligatorias al enviar el form:
+// exigimos que el cliente confirme el marker para reducir novedades del
+// mensajero por direcciones ambiguas.
 const coords = ref<{ lat: number; lng: number } | null>(null)
 
+// Cantones disponibles según la provincia elegida. Cascada: al cambiar de
+// provincia, si la ciudad ya seleccionada no pertenece a la nueva lista la
+// limpiamos.
+const ciudadesDisponibles = computed<string[]>(() => {
+  const p = form.value.provincia as ProvinciaEC
+  return (p && CANTONES_POR_PROVINCIA[p]) || []
+})
+
+watch(
+  () => form.value.provincia,
+  (nueva) => {
+    const ciudades = (nueva && CANTONES_POR_PROVINCIA[nueva as ProvinciaEC]) || []
+    if (form.value.ciudad && !ciudades.includes(form.value.ciudad)) {
+      form.value.ciudad = ''
+    }
+  },
+)
+
+// Query para el map picker: "Guayaquil, Guayas, Ecuador". Cuando cambia,
+// MapPicker hace forward-geocoding y re-centra el mapa + mueve el pin.
+const mapTargetLocation = computed(() =>
+  form.value.provincia && form.value.ciudad
+    ? geocodeQuery(form.value.provincia, form.value.ciudad)
+    : '',
+)
+
 function onMapAddress(address: string) {
-  // Solo reemplazamos si el campo está vacío o el cliente no lo ha editado
-  // desde que pickeó. Si ya escribió algo manual, respetamos eso.
-  if (!form.value.direccion.trim()) form.value.direccion = address
-  else form.value.direccion = address
+  // Cada actualización del pin reescribe la dirección textual. El cliente
+  // puede editar el campo a mano después si quiere agregar detalles.
+  form.value.direccion = address
 }
 function onMapCoords(c: { lat: number; lng: number }) {
   coords.value = c
 }
-function onMapLocality(loc: { provincia?: string; ciudad?: string }) {
-  // Autocomplete suave: solo llenamos campos vacíos, no pisamos lo que ya eligió.
-  if (!form.value.provincia && loc.provincia) {
-    // Match case-insensitive contra la lista estandarizada
-    const match = PROVINCIAS_EC.find(
-      (p) => p.toLowerCase() === loc.provincia!.toLowerCase(),
-    )
-    if (match) form.value.provincia = match
-  }
-  if (!form.value.ciudad.trim() && loc.ciudad) form.value.ciudad = loc.ciudad
+function onMapLocality(_loc: { provincia?: string; ciudad?: string }) {
+  // Ya no autocompletamos provincia/ciudad desde el mapa — el cliente los
+  // elige explícitamente desde los dropdowns antes de tocar el pin.
 }
 
 const submitting = ref(false)
 const done = ref(false)
 const error = ref<string | null>(null)
-
-// Provincias de Ecuador (para dropdown sin teclear mal)
-const PROVINCIAS_EC = [
-  'Azuay','Bolívar','Cañar','Carchi','Chimborazo','Cotopaxi','El Oro','Esmeraldas',
-  'Galápagos','Guayas','Imbabura','Loja','Los Ríos','Manabí','Morona Santiago',
-  'Napo','Orellana','Pastaza','Pichincha','Santa Elena','Santo Domingo de los Tsáchilas',
-  'Sucumbíos','Tungurahua','Zamora Chinchipe',
-]
 
 onMounted(async () => {
   // Validar código de referido (si viene en el URL) — es fire-and-forget
@@ -140,8 +158,20 @@ async function submit() {
     error.value = 'Teléfono inválido. Usa sólo números (mínimo 7 dígitos).'
     return
   }
+  if (!form.value.provincia) {
+    error.value = 'Selecciona tu provincia.'
+    return
+  }
+  if (!form.value.ciudad) {
+    error.value = 'Selecciona tu ciudad.'
+    return
+  }
   if (!form.value.direccion.trim() || form.value.direccion.trim().length < 5) {
     error.value = 'Escribe tu dirección completa.'
+    return
+  }
+  if (!coords.value) {
+    error.value = 'Ubica tu casa en el mapa moviendo el pin.'
     return
   }
   if (!productoSlug.value && !form.value.producto_id) {
@@ -424,24 +454,31 @@ function aceptarBundle() {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="space-y-1">
-              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">Provincia</label>
+              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Provincia<span class="text-red-500">*</span>
+              </label>
               <select
                 v-model="form.provincia"
                 class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2 bg-white"
               >
-                <option value="">— Elegir —</option>
+                <option value="">— Elegir provincia —</option>
                 <option v-for="p in PROVINCIAS_EC" :key="p" :value="p">{{ p }}</option>
               </select>
             </div>
             <div class="space-y-1">
-              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">Ciudad</label>
-              <input
+              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Ciudad<span class="text-red-500">*</span>
+              </label>
+              <select
                 v-model="form.ciudad"
-                type="text"
-                placeholder="Ej. Quito"
-                autocomplete="address-level2"
-                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
-              />
+                :disabled="!form.provincia"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">
+                  {{ form.provincia ? '— Elegir ciudad —' : 'Elige primero la provincia' }}
+                </option>
+                <option v-for="c in ciudadesDisponibles" :key="c" :value="c">{{ c }}</option>
+              </select>
             </div>
           </div>
 
@@ -453,12 +490,13 @@ function aceptarBundle() {
               v-model="form.direccion"
               type="text"
               required
-              placeholder="Calle, número, sector"
+              placeholder="Se llena automáticamente al mover el pin"
               autocomplete="street-address"
               class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
             />
             <MapPicker
               :value="coords"
+              :target-location="mapTargetLocation"
               @address="onMapAddress"
               @coords="onMapCoords"
               @locality="onMapLocality"
