@@ -193,96 +193,105 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="px-8 py-8">
     <!-- Header -->
-    <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-lavanda-medio">
-      <h3 class="text-xl font-bold text-navy">Base de Clientes Frecuentes</h3>
-      <div class="flex items-center gap-3">
-        <div class="relative">
-        <input
-          v-model="busqueda"
-          @input="onBuscar"
-          type="text"
-          placeholder="Buscar cliente..."
-          class="p-2 pl-9 bg-lavanda/50 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-sm text-navy min-w-[250px]"
-        />
-        <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-mauve text-sm"></i>
+    <div class="flex items-end justify-between mb-6 flex-wrap gap-4">
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-faint mb-2">
+          {{ store.clientes.length }} clientes
+        </div>
+        <h1 class="h-display text-[40px] leading-none">Clientes</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 px-3 h-9 rounded-md surface">
+          <svg class="w-3.5 h-3.5 text-ink-faint" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="7" cy="7" r="4.5"/><path d="M13 13l-2.5-2.5"/>
+          </svg>
+          <input
+            v-model="busqueda"
+            @input="onBuscar"
+            type="text"
+            placeholder="Buscar por nombre, teléfono…"
+            class="bg-transparent outline-none text-[12px] w-64 placeholder:text-ink-faint text-ink"
+          />
         </div>
         <button
           @click="abrirCrearCliente"
-          class="bg-mauve text-white px-4 py-2 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
+          class="h-9 px-3 rounded-md text-[12px] font-medium hover:opacity-90 transition flex items-center gap-2"
+          style="background: var(--ink); color: var(--paper);"
         >
-          <i class="pi pi-plus"></i> Nuevo Cliente
+          <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 3v10M3 8h10" stroke-linecap="round"/>
+          </svg>
+          Nuevo cliente
         </button>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="store.loading" class="text-center py-12">
-      <i class="pi pi-spin pi-spinner text-4xl text-mauve"></i>
-      <p class="text-navy/60 mt-2">Cargando clientes...</p>
+    <div v-if="store.loading" class="surface rounded-xl p-16 text-center">
+      <div class="inline-block w-5 h-5 border-2 rounded-full animate-spin" style="border-color: var(--line); border-top-color: var(--accent);"></div>
+      <p class="text-[13px] text-ink-muted mt-3">Cargando clientes…</p>
     </div>
 
     <!-- Tabla -->
-    <div v-else class="bg-white rounded-xl shadow-sm border border-lavanda-medio overflow-x-auto">
-      <table class="w-full text-left min-w-[600px]">
-        <thead class="bg-lavanda-medio text-navy text-xs uppercase font-bold tracking-wider">
-          <tr>
-            <th class="p-4">Cliente</th>
-            <th class="p-4 text-center">Pedidos Totales</th>
-            <th class="p-4">Monto Comprado</th>
-            <th class="p-4 text-center">Acción</th>
+    <div v-else class="surface rounded-xl overflow-hidden">
+      <div v-if="store.clientes.length === 0" class="empty-pattern py-16 text-center">
+        <p class="text-[13px] text-ink-muted">No se encontraron clientes</p>
+      </div>
+      <table v-else class="w-full text-[13px]">
+        <thead>
+          <tr
+            class="border-b hairline text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold"
+            style="background: var(--paper-alt);"
+          >
+            <th class="py-2.5 pl-5 pr-2 text-left">Cliente</th>
+            <th class="py-2.5 px-2 text-left">Ciudad</th>
+            <th class="py-2.5 px-2 text-right">Pedidos</th>
+            <th class="py-2.5 px-2 text-right">LTV</th>
+            <th class="py-2.5 pl-2 pr-5 text-right w-24"></th>
           </tr>
         </thead>
-        <tbody class="text-sm divide-y divide-lavanda">
+        <tbody class="divide-y hairline">
           <tr
             v-for="cliente in store.clientes"
             :key="cliente.id"
-            class="hover:bg-lavanda/50 transition"
+            class="hover:bg-paper-alt cursor-pointer row-parent"
+            @click="verPerfil(cliente)"
           >
-            <!-- Cliente -->
-            <td class="p-4 flex items-center gap-3">
-              <div class="w-10 h-10 bg-lavanda rounded-full flex items-center justify-center text-navy font-bold shrink-0">
-                {{ iniciales(cliente.nombre) }}
-              </div>
-              <div>
-                <p class="font-bold text-navy text-base">{{ cliente.nombre }}</p>
-                <p class="text-xs text-navy/60">{{ cliente.telefono }}</p>
+            <td class="py-3 pl-5 pr-2">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold shrink-0"
+                  style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft)); color: var(--rose-fg);"
+                >
+                  {{ iniciales(cliente.nombre) }}
+                </div>
+                <div class="min-w-0">
+                  <div class="font-medium truncate">{{ cliente.nombre }}</div>
+                  <div class="text-[11px] text-ink-faint tabular font-mono">{{ cliente.telefono }}</div>
+                </div>
               </div>
             </td>
-
-            <!-- Pedidos Totales -->
-            <td class="p-4 text-center font-bold text-mauve text-lg">{{ cliente.pedidos_total }}</td>
-
-            <!-- Monto Comprado -->
-            <td class="p-4 font-bold text-navy">${{ Number(cliente.monto_total).toFixed(2) }}</td>
-
-            <!-- Acción -->
-            <td class="p-4 text-center">
-              <div class="flex items-center justify-center gap-1">
-                <button
-                  @click="verPerfil(cliente)"
-                  class="bg-lavanda-medio text-navy px-3 py-1.5 rounded-lg font-medium hover:bg-mauve hover:text-white transition text-xs"
-                >
-                  <i class="pi pi-user-edit mr-1"></i> Ver Perfil
-                </button>
-                <button
-                  @click="eliminarCliente(cliente)"
-                  class="px-3 py-1.5 rounded-lg bg-alerta text-white hover:bg-red-600 transition text-xs font-bold flex items-center gap-1"
-                >
-                  <i class="pi pi-times text-xs"></i> Eliminar
-                </button>
-              </div>
+            <td class="py-3 px-2 text-[12px] text-ink-muted">
+              {{ [cliente.ciudad, cliente.provincia].filter(Boolean).join(', ') || '—' }}
+            </td>
+            <td class="py-3 px-2 text-right font-mono tabular">{{ cliente.pedidos_total }}</td>
+            <td class="py-3 px-2 text-right font-mono tabular">${{ Number(cliente.monto_total).toFixed(2) }}</td>
+            <td class="py-3 pl-2 pr-5 text-right">
+              <button
+                @click.stop="eliminarCliente(cliente)"
+                class="row-actions w-6 h-6 grid place-items-center rounded hover:bg-paper-alt ml-auto"
+                title="Eliminar"
+              >
+                <svg class="w-3.5 h-3.5" style="color: var(--rose-dot);" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M3 4h10M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1m-5 0v9a1 1 0 001 1h4a1 1 0 001-1V4" stroke-linecap="round"/>
+                </svg>
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
-
-      <!-- Vacío -->
-      <div v-if="store.clientes.length === 0" class="text-center py-12">
-        <i class="pi pi-users text-5xl text-lavanda-medio"></i>
-        <p class="text-navy/60 mt-3">No se encontraron clientes</p>
-      </div>
     </div>
 
     <!-- Sidebar perfil del cliente -->

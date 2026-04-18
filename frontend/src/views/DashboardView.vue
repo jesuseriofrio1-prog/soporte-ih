@@ -1,571 +1,456 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Line, Doughnut } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js'
 import { useDashboardStore } from '../stores/dashboard'
-import { useProductosStore } from '../stores/productos'
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
+import { usePedidosStore } from '../stores/pedidos'
 
 const router = useRouter()
 const dashStore = useDashboardStore()
-const productosStore = useProductosStore()
+const pedidosStore = usePedidosStore()
 
-// ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
+// ────────────── Helpers ──────────────
 
-function formatMoney(val: number | null | undefined): string {
+function formatMoney(val: number | null | undefined, decimals = 2): string {
   return (val || 0).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })
 }
 
-function formatTimestamp(iso: string | undefined): string {
+function formatRelative(iso: string | undefined): string {
   if (!iso) return '—'
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return 'ahora'
+  if (min < 60) return `${min}m`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `${h}h`
+  return `${Math.floor(h / 24)}d`
 }
 
-// ─────────────────────────────────────────────
-// Producto con menor stock
-// ─────────────────────────────────────────────
+// ────────────── Periodo (Mes / Semana / Hoy) ──────────────
+const periodo = ref<'mes' | 'semana' | 'hoy'>('mes')
 
-const productoMenorStock = computed(() => {
-  if (productosStore.productos.length === 0) return null
-  return [...productosStore.productos].sort((a, b) => a.stock - b.stock)[0]
+const periodoLabel = computed(() => {
+  const mes = new Date().toLocaleDateString('es-EC', { month: 'long', year: 'numeric' })
+  if (periodo.value === 'mes') return mes
+  if (periodo.value === 'semana') return 'Esta semana'
+  return 'Hoy'
 })
 
-const transitoTexto = computed(() => {
-  const n = dashStore.stats?.en_transito || 0
-  if (n === 0) return 'Sin envíos activos'
-  return `${n} envío${n > 1 ? 's' : ''} en curso`
+const periodoTitulo = computed(() => {
+  if (periodo.value === 'mes') return 'del mes'
+  if (periodo.value === 'semana') return 'de la semana'
+  return 'de hoy'
 })
 
-// ─────────────────────────────────────────────
-// Chart 1: Facturación últimos 7 días
-// ─────────────────────────────────────────────
+// ────────────── KPIs derivados ──────────────
+// El backend solo da stats del mes. Para semana/hoy usamos los agregados
+// que ya tenemos; si faltan, mostramos "—".
 
-const ventasChartData = computed(() => ({
-  labels: dashStore.ventasSemana.map((v) => v.dia),
-  datasets: [
-    {
-      label: 'Ventas ($)',
-      data: dashStore.ventasSemana.map((v) => Number(v.total)),
-      borderColor: '#C49BC2',
-      backgroundColor: 'rgba(196, 155, 194, 0.15)',
-      pointBackgroundColor: '#030363',
-      pointBorderColor: '#030363',
-      pointRadius: 5,
-      pointHoverRadius: 7,
-      tension: 0.3,
-      fill: true,
-    },
-  ],
-}))
+const stats = computed(() => dashStore.stats)
 
-const ventasChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: '#030363',
-      titleColor: '#FFFFFF',
-      bodyColor: '#FFFFFF',
-      padding: 10,
-      cornerRadius: 8,
-      callbacks: {
-        label: (ctx: { parsed: { y: number | null } }) =>
-          `$${(ctx.parsed.y ?? 0).toFixed(2)}`,
-      },
-    },
-  },
-  scales: {
-    x: {
-      grid: { display: false },
-      ticks: { color: '#030363', font: { weight: 'bold' as const } },
-    },
-    y: {
-      grid: { color: '#E6E6FB' },
-      ticks: {
-        color: '#030363',
-        callback: (value: string | number) => `$${value}`,
-      },
-    },
-  },
-}
+const kpiVentas = computed(() => stats.value?.ventas_mes ?? 0)
+const kpiPedidos = computed(() => stats.value?.pedidos_mes ?? 0)
+const kpiTicket = computed(() => stats.value?.promedio_pedido ?? 0)
+const kpiEntrega = computed(() => stats.value?.porcentaje_entrega ?? 0)
+const kpiConfirmacion = computed(() => stats.value?.porcentaje_confirmacion ?? 0)
+const kpiTransito = computed(() => stats.value?.facturacion_en_transito ?? 0)
+const kpiTransitoCount = computed(() => stats.value?.en_transito ?? 0)
+const kpiNovedad = computed(() => stats.value?.facturacion_en_novedad ?? 0)
+const kpiNovedadCount = computed(() => stats.value?.novedades ?? 0)
+const kpiConfirmadosMes = computed(() => stats.value?.confirmados_mes ?? 0)
 
-// ─────────────────────────────────────────────
-// Chart 2: Pedidos últimos 7 días (3 series)
-// ─────────────────────────────────────────────
+// ────────────── Pipeline (breakdown por estado) ──────────────
 
-const pedidosChartData = computed(() => ({
-  labels: dashStore.pedidosSemana.map((p) => p.dia),
-  datasets: [
-    {
-      label: 'Entrantes',
-      data: dashStore.pedidosSemana.map((p) => Number(p.entrantes)),
-      borderColor: '#3B82F6',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-      pointBackgroundColor: '#3B82F6',
-      pointRadius: 4,
-      tension: 0.3,
-      fill: false,
-    },
-    {
-      label: 'Confirmados',
-      data: dashStore.pedidosSemana.map((p) => Number(p.confirmados)),
-      borderColor: '#C49BC2',
-      backgroundColor: 'rgba(196, 155, 194, 0.1)',
-      pointBackgroundColor: '#C49BC2',
-      pointRadius: 4,
-      tension: 0.3,
-      fill: false,
-    },
-    {
-      label: 'Entregados',
-      data: dashStore.pedidosSemana.map((p) => Number(p.entregados)),
-      borderColor: '#22C55E',
-      backgroundColor: 'rgba(34, 197, 94, 0.1)',
-      pointBackgroundColor: '#22C55E',
-      pointRadius: 4,
-      tension: 0.3,
-      fill: false,
-    },
-  ],
-}))
+const pipelineItems = computed(() => {
+  const pedidos = pedidosStore.pedidos
+  const total = pedidos.length || 1
+  const count = (estados: string[]) =>
+    pedidos.filter((p) => estados.includes(p.estado)).length
 
-const pedidosChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: true,
-      position: 'bottom' as const,
-      labels: {
-        color: '#030363',
-        font: { size: 11, weight: 'bold' as const },
-        padding: 12,
-        usePointStyle: true,
-        pointStyleWidth: 10,
-      },
-    },
-    tooltip: {
-      backgroundColor: '#030363',
-      titleColor: '#FFFFFF',
-      bodyColor: '#FFFFFF',
-      padding: 10,
-      cornerRadius: 8,
-    },
-  },
-  scales: {
-    x: {
-      grid: { display: false },
-      ticks: { color: '#030363', font: { weight: 'bold' as const } },
-    },
-    y: {
-      grid: { color: '#E6E6FB' },
-      ticks: {
-        color: '#030363',
-        stepSize: 1,
-        precision: 0,
-      },
-      beginAtZero: true,
-    },
-  },
-}
+  const entregados = count(['ENTREGADO'])
+  const transito = count(['ENVIADO', 'EN_RUTA', 'RETIRO_EN_AGENCIA'])
+  const novedad = count(['NOVEDAD', 'NO_ENTREGADO'])
+  const pendiente = count(['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION'])
+  const devuelto = count(['DEVUELTO'])
 
-// ─────────────────────────────────────────────
-// Chart canales (doughnut)
-// ─────────────────────────────────────────────
+  return [
+    { key: 'entregado',  label: 'Entregado',   dot: 'dot-emerald', count: entregados, pct: (entregados / total) * 100 },
+    { key: 'transito',   label: 'En tránsito', dot: 'dot-blue',    count: transito,   pct: (transito / total) * 100 },
+    { key: 'novedad',    label: 'Novedad',     dot: 'dot-amber',   count: novedad,    pct: (novedad / total) * 100 },
+    { key: 'pendiente',  label: 'Pendiente',   dot: 'dot-stone',   count: pendiente,  pct: (pendiente / total) * 100 },
+    { key: 'devuelto',   label: 'Devuelto',    dot: 'dot-rose',    count: devuelto,   pct: (devuelto / total) * 100 },
+  ]
+})
 
-const CANAL_COLORES = ['#C49BC2', '#030363', '#25D366', '#C8C8E9', '#EF4444', '#3B82F6', '#F59E0B']
+// ────────────── Producto estrella ──────────────
 
-const canalesChartData = computed(() => ({
-  labels: dashStore.canalesStats.map((c) => c.canal),
-  datasets: [
-    {
-      data: dashStore.canalesStats.map((c) => Number(c.total)),
-      backgroundColor: CANAL_COLORES.slice(0, dashStore.canalesStats.length),
-      borderWidth: 2,
-      borderColor: '#FFFFFF',
-    },
-  ],
-}))
-
-const canalesChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  cutout: '65%',
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-      labels: {
-        color: '#030363',
-        font: { size: 11, weight: 'bold' as const },
-        padding: 12,
-        usePointStyle: true,
-        pointStyleWidth: 10,
-      },
-    },
-    tooltip: {
-      backgroundColor: '#030363',
-      titleColor: '#FFFFFF',
-      bodyColor: '#FFFFFF',
-      padding: 10,
-      cornerRadius: 8,
-    },
-  },
-}
-
-// ─────────────────────────────────────────────
-// Lifecycle
-// ─────────────────────────────────────────────
-
-// Auto-refresh: cada 60 segundos revalida los datos del dashboard en
-// background. El usuario puede pausarlo con el toggle del header.
-const autoRefreshMs = 60_000
-const autoRefreshOn = ref(true)
-let pollTimer: ReturnType<typeof setInterval> | null = null
-
-function refrescar() {
-  dashStore.fetchAll()
-  productosStore.fetchProductos(true)
-}
-
-function toggleAutoRefresh() {
-  autoRefreshOn.value = !autoRefreshOn.value
-  if (autoRefreshOn.value) startPolling()
-  else stopPolling()
-}
-
-function startPolling() {
-  stopPolling()
-  pollTimer = setInterval(() => {
-    if (document.visibilityState === 'visible') refrescar()
-  }, autoRefreshMs)
-}
-
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
+const productoEstrella = computed(() => {
+  const ranking = new Map<string, { id: string; nombre: string; unidades: number; ventas: number }>()
+  for (const p of pedidosStore.pedidos) {
+    if (!p.producto_id || !p.productos?.nombre) continue
+    const prev = ranking.get(p.producto_id) ?? {
+      id: p.producto_id, nombre: p.productos.nombre, unidades: 0, ventas: 0,
+    }
+    prev.unidades += 1
+    prev.ventas += Number(p.monto) || 0
+    ranking.set(p.producto_id, prev)
   }
+  return Array.from(ranking.values()).sort((a, b) => b.unidades - a.unidades).slice(0, 3)
+})
+
+// ────────────── Actividad reciente ──────────────
+// Combinamos los últimos cambios de estado (desde pedidos.updated_at) como
+// stream. Un futuro backend de activity log reemplazaría esto.
+
+interface ActivityItem {
+  ts: string
+  dotClass: string
+  html: string
 }
+
+const actividad = computed<ActivityItem[]>(() => {
+  const pedidos = [...pedidosStore.pedidos]
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, 6)
+
+  const dotByEstado: Record<string, string> = {
+    ENTREGADO: 'dot-emerald',
+    NOVEDAD: 'dot-amber',
+    NO_ENTREGADO: 'dot-rose',
+    DEVUELTO: 'dot-rose',
+    ENVIADO: 'dot-blue',
+    EN_RUTA: 'dot-blue',
+    RETIRO_EN_AGENCIA: 'dot-blue',
+    PENDIENTE: 'dot-stone',
+    CONFIRMADO: 'dot-stone',
+    EN_PREPARACION: 'dot-stone',
+  }
+
+  return pedidos.map((p) => ({
+    ts: p.updated_at,
+    dotClass: dotByEstado[p.estado] || 'dot-stone',
+    html: `Pedido de <span class="font-medium">${escapeHtml(p.cliente_nombre || p.clientes?.nombre || '—')}</span> · <span class="font-medium">${p.estado.toLowerCase().replace(/_/g, ' ')}</span>`,
+  }))
+})
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]!))
+}
+
+// ────────────── Auto-refresh ──────────────
+const AUTO_REFRESH_MS = 60_000
+let intervalId: number | null = null
 
 onMounted(() => {
-  dashStore.fetchAll()
-  productosStore.fetchProductos(true)
-  startPolling()
+  intervalId = window.setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      dashStore.fetchAll()
+    }
+  }, AUTO_REFRESH_MS)
 })
 
 onBeforeUnmount(() => {
-  stopPolling()
+  if (intervalId !== null) clearInterval(intervalId)
 })
+
+function irAPedidosNovedad() {
+  router.push('/pedidos?filtro=novedades')
+}
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Timestamp + refresh + auto-refresh toggle -->
-    <div class="flex items-center gap-3 text-xs text-navy/60 flex-wrap">
-      <span>
-        Actualizado:
-        <b v-if="dashStore.stats">{{ formatTimestamp(dashStore.stats.actualizado_en) }}</b>
-        <span v-else>—</span>
-      </span>
-
-      <button
-        @click="refrescar"
-        :disabled="dashStore.loading"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-lavanda-medio hover:bg-lavanda/50 transition text-navy/80 disabled:opacity-50"
-        aria-label="Refrescar dashboard"
-      >
-        <i class="pi pi-refresh" :class="{ 'pi-spin': dashStore.loading }" aria-hidden="true"></i>
-        <span>Refrescar</span>
-      </button>
-
-      <button
-        @click="toggleAutoRefresh"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition"
-        :class="autoRefreshOn
-          ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100'
-          : 'border-lavanda-medio text-navy/60 hover:bg-lavanda/50'"
-        :aria-label="autoRefreshOn ? 'Pausar auto-refresh' : 'Activar auto-refresh'"
-        :title="autoRefreshOn ? 'Auto-refresh activo cada 60s — click para pausar' : 'Auto-refresh pausado — click para reactivar'"
-      >
-        <span class="inline-block w-1.5 h-1.5 rounded-full" :class="autoRefreshOn ? 'bg-green-500 animate-pulse' : 'bg-navy/30'"></span>
-        <span>Auto {{ autoRefreshOn ? 'ON' : 'OFF' }}</span>
-      </button>
+  <div class="px-8 py-8 max-w-[1320px]">
+    <!-- Heading -->
+    <div class="flex items-end justify-between mb-8 flex-wrap gap-4">
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-faint mb-2">
+          {{ periodoLabel }}
+        </div>
+        <h1 class="h-display text-[40px] leading-none">
+          Panorama <span class="h-display-italic text-ink-muted">{{ periodoTitulo }}</span>
+        </h1>
+      </div>
+      <div class="flex items-center gap-1 p-1 rounded-lg surface">
+        <button
+          v-for="p in (['mes','semana','hoy'] as const)"
+          :key="p"
+          @click="periodo = p"
+          class="px-3 py-1 rounded-md text-[12px] transition"
+          :class="periodo === p ? 'font-medium' : 'text-ink-muted hover:bg-paper-alt'"
+          :style="periodo === p ? { background: 'var(--ink)', color: 'var(--paper)' } : {}"
+        >
+          {{ p === 'mes' ? 'Mes' : p === 'semana' ? 'Semana' : 'Hoy' }}
+        </button>
+      </div>
     </div>
 
-    <!-- Loading state (solo si no hay stats cacheado — refresh manual deja KPIs visibles) -->
-    <div v-if="dashStore.loading && !dashStore.stats" class="text-center py-20">
-      <i class="pi pi-spin pi-spinner text-4xl text-mauve" aria-hidden="true"></i>
-      <p class="text-navy/60 mt-2">Cargando dashboard...</p>
+    <!-- Loading state -->
+    <div v-if="dashStore.loading && !stats" class="surface rounded-xl p-16 text-center">
+      <div class="inline-block w-5 h-5 border-2 rounded-full animate-spin" style="border-color: var(--line); border-top-color: var(--accent);"></div>
+      <p class="text-[13px] text-ink-muted mt-3">Cargando panorama…</p>
     </div>
 
-    <template v-else-if="dashStore.stats">
-      <!-- ================== Stat Cards principales ================== -->
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <!-- Ventas Mes -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio relative overflow-hidden group">
-          <div class="absolute right-0 top-0 h-full w-2 bg-mauve"></div>
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase text-navy/60">Ventas Mes</p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Suma de montos de TODOS los pedidos creados en el mes actual (sin filtrar por estado)."
-              aria-hidden="true"
-            ></i>
+    <template v-else>
+      <!-- KPIs: 6 celdas en grid único con hairlines -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 surface rounded-xl overflow-hidden mb-10">
+        <div class="p-5 border-r border-b lg:border-b-0 hairline">
+          <div class="text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold mb-3">Ventas</div>
+          <div class="flex items-baseline gap-1.5 mb-3">
+            <span class="text-[13px] text-ink-muted tabular">$</span>
+            <span class="text-[26px] h-display tabular leading-none">{{ formatMoney(kpiVentas) }}</span>
           </div>
-          <p class="text-3xl font-black text-navy">${{ formatMoney(dashStore.stats.ventas_mes) }}</p>
+          <div class="text-[11px] text-ink-faint">Total facturado</div>
         </div>
 
-        <!-- Pedidos Mes -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase text-navy/60">Pedidos Mes</p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Número de pedidos creados este mes, en cualquier estado."
-              aria-hidden="true"
-            ></i>
+        <div class="p-5 border-r border-b lg:border-b-0 hairline">
+          <div class="text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold mb-3">Pedidos</div>
+          <div class="flex items-baseline gap-1.5 mb-3">
+            <span class="text-[26px] h-display tabular leading-none">{{ kpiPedidos }}</span>
+            <span class="text-[11px] text-ink-muted tabular font-mono">/ ${{ formatMoney(kpiTicket) }}</span>
           </div>
-          <p class="text-3xl font-black text-navy">{{ dashStore.stats.pedidos_mes }}</p>
-          <p v-if="dashStore.stats.pedidos_mes > 0" class="text-xs font-bold text-navy/50 mt-2">
-            Promedio: ${{ formatMoney(dashStore.stats.promedio_pedido) }} / pedido
-          </p>
+          <div class="text-[11px] text-ink-faint">Ticket promedio</div>
         </div>
 
-        <!-- En Tránsito -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase text-navy/60">En Tránsito / Agencia</p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Pedidos con estado ENVIADO, EN_RUTA o RETIRO_EN_AGENCIA."
-              aria-hidden="true"
-            ></i>
+        <div class="p-5 border-r border-b lg:border-b-0 hairline">
+          <div class="text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold mb-3">Entrega</div>
+          <div class="flex items-baseline gap-1.5 mb-3">
+            <span class="text-[26px] h-display tabular leading-none">{{ kpiEntrega.toFixed(1) }}</span>
+            <span class="text-[13px] text-ink-muted">%</span>
           </div>
-          <p class="text-3xl font-black text-navy">{{ dashStore.stats.en_transito }}</p>
-          <p class="text-xs font-bold text-blue-500 mt-2">
-            <i class="pi pi-truck" aria-hidden="true"></i> {{ transitoTexto }}
-          </p>
+          <div class="text-[11px] text-ink-faint">Tasa del mes</div>
         </div>
 
-        <!-- Riesgo Devolución -->
-        <div
-          class="p-6 rounded-xl shadow-sm relative overflow-hidden"
-          :class="dashStore.stats.riesgo_devolucion > 0
-            ? 'bg-red-50 border border-red-200'
-            : 'bg-white border border-lavanda-medio'"
-        >
-          <div
-            v-if="dashStore.stats.riesgo_devolucion > 0"
-            class="absolute right-0 top-0 h-full w-2 bg-alerta animate-pulse"
-          ></div>
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase" :class="dashStore.stats.riesgo_devolucion > 0 ? 'text-alerta' : 'text-navy/60'">
-              Riesgo Devolución
-            </p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Pedidos esperando en agencia desde hace 6+ días. Servientrega los devuelve después de 8."
-              aria-hidden="true"
-            ></i>
+        <div class="p-5 border-r hairline">
+          <div class="text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold mb-3">Confirmación</div>
+          <div class="flex items-baseline gap-1.5 mb-3">
+            <span class="text-[26px] h-display tabular leading-none">{{ kpiConfirmacion.toFixed(0) }}</span>
+            <span class="text-[13px] text-ink-muted">%</span>
           </div>
-          <p class="text-3xl font-black" :class="dashStore.stats.riesgo_devolucion > 0 ? 'text-red-600' : 'text-navy'">
-            {{ dashStore.stats.riesgo_devolucion }}
-          </p>
-          <p
-            v-if="dashStore.stats.riesgo_devolucion > 0"
-            class="text-xs font-bold text-red-600 mt-2 cursor-pointer hover:underline"
-            @click="router.push({ path: '/pedidos', query: { filtro: 'novedades' } })"
+          <div class="text-[11px] text-ink-faint tabular font-mono">{{ kpiConfirmadosMes }} / {{ kpiPedidos }}</div>
+        </div>
+
+        <div class="p-5 border-r hairline">
+          <div class="text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold mb-3">Tránsito</div>
+          <div class="flex items-baseline gap-1.5 mb-3">
+            <span class="text-[13px] text-ink-muted tabular">$</span>
+            <span class="text-[26px] h-display tabular leading-none">{{ formatMoney(kpiTransito) }}</span>
+          </div>
+          <div class="text-[11px] text-ink-faint">
+            {{ kpiTransitoCount === 0 ? 'Sin envíos activos' : `${kpiTransitoCount} en curso` }}
+          </div>
+        </div>
+
+        <!-- Novedad (destacado) -->
+        <div class="p-5 surface-amber relative">
+          <div class="absolute top-0 right-0 w-1 h-full dot-amber"></div>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[10px] uppercase tracking-[0.1em] font-semibold" style="color: var(--amber-fg);">Novedad</span>
+            <span class="state-dot dot-amber"></span>
+          </div>
+          <div class="flex items-baseline gap-1.5 mb-3">
+            <span class="text-[13px] tabular" style="color: var(--amber-fg);">$</span>
+            <span class="text-[26px] h-display tabular leading-none" style="color: var(--amber-fg);">
+              {{ formatMoney(kpiNovedad) }}
+            </span>
+          </div>
+          <button
+            v-if="kpiNovedadCount > 0"
+            @click="irAPedidosNovedad"
+            class="text-[11px] font-medium hover:underline"
+            style="color: var(--amber-fg);"
           >
-            <i class="pi pi-exclamation-circle" aria-hidden="true"></i> Requieren atención hoy
-          </p>
-          <p v-else class="text-xs font-bold text-green-500 mt-2">
-            <i class="pi pi-check-circle" aria-hidden="true"></i> Sin riesgos
-          </p>
+            {{ kpiNovedadCount }} pedido{{ kpiNovedadCount === 1 ? '' : 's' }} · revisar →
+          </button>
+          <span v-else class="text-[11px]" style="color: var(--amber-fg); opacity: 0.7;">
+            Sin novedades
+          </span>
         </div>
       </div>
 
-      <!-- ================== KPIs fase 1 ================== -->
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <!-- % Confirmación -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase text-navy/60">% Confirmación</p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Porcentaje de pedidos del mes que ya salieron del estado PENDIENTE (fueron confirmados o avanzaron en el flujo)."
-              aria-hidden="true"
-            ></i>
-          </div>
-          <p class="text-3xl font-black text-navy">
-            {{ dashStore.stats.porcentaje_confirmacion }}<span class="text-xl">%</span>
-          </p>
-          <p class="text-xs font-bold text-navy/50 mt-2">
-            {{ dashStore.stats.confirmados_mes }} / {{ dashStore.stats.pedidos_mes }} del mes
-          </p>
-        </div>
-
-        <!-- % Entrega -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase text-navy/60">% Entrega</p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Entregados / (entregados + no entregados + devueltos) del mes. Solo cuenta pedidos ya cerrados, no los que siguen en tránsito."
-              aria-hidden="true"
-            ></i>
-          </div>
-          <p class="text-3xl font-black text-navy">
-            {{ dashStore.stats.porcentaje_entrega }}<span class="text-xl">%</span>
-          </p>
-          <p class="text-xs font-bold text-navy/50 mt-2">
-            {{ dashStore.stats.entregados_mes }} entregados del mes
-          </p>
-        </div>
-
-        <!-- Facturación en tránsito -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase text-navy/60">Fact. en Tránsito</p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Monto total de los pedidos en estado ENVIADO, EN_RUTA o RETIRO_EN_AGENCIA. Aún pueden caerse o devolverse."
-              aria-hidden="true"
-            ></i>
-          </div>
-          <p class="text-3xl font-black text-navy">${{ formatMoney(dashStore.stats.facturacion_en_transito) }}</p>
-          <p class="text-xs font-bold text-blue-500 mt-2">
-            <i class="pi pi-send" aria-hidden="true"></i> En circulación
-          </p>
-        </div>
-
-        <!-- Facturación en novedad -->
-        <div
-          class="p-6 rounded-xl shadow-sm border"
-          :class="dashStore.stats.novedades > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-lavanda-medio'"
-        >
-          <div class="flex items-start justify-between mb-1">
-            <p class="text-sm font-bold uppercase" :class="dashStore.stats.novedades > 0 ? 'text-orange-700' : 'text-navy/60'">
-              Fact. en Novedad
-            </p>
-            <i
-              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
-              title="Monto total de los pedidos con estado NOVEDAD o NO_ENTREGADO. Revísalos en la sección Novedades."
-              aria-hidden="true"
-            ></i>
-          </div>
-          <p class="text-3xl font-black" :class="dashStore.stats.novedades > 0 ? 'text-orange-700' : 'text-navy'">
-            ${{ formatMoney(dashStore.stats.facturacion_en_novedad) }}
-          </p>
-          <p
-            v-if="dashStore.stats.novedades > 0"
-            class="text-xs font-bold text-orange-700 mt-2 cursor-pointer hover:underline"
-            @click="router.push({ path: '/pedidos', query: { filtro: 'novedades' } })"
-          >
-            <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-            {{ dashStore.stats.novedades }} novedad{{ dashStore.stats.novedades > 1 ? 'es' : '' }}
-          </p>
-          <p v-else class="text-xs font-bold text-green-500 mt-2">
-            <i class="pi pi-check-circle" aria-hidden="true"></i> Sin novedades
-          </p>
-        </div>
-      </div>
-
-      <!-- ================== Charts (dos columnas en lg) ================== -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Chart pedidos semana -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <h3 class="text-lg font-bold text-navy mb-4">Pedidos últimos 7 días</h3>
-          <div class="relative h-64 w-full">
-            <Line
-              v-if="dashStore.pedidosSemana.length > 0"
-              :data="pedidosChartData"
-              :options="pedidosChartOptions"
-            />
-            <div v-else class="flex items-center justify-center h-full">
-              <p class="text-navy/40">Sin datos de pedidos esta semana</p>
+      <!-- Main grid: gráfico + pipeline -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+        <!-- Gráfico 7 días -->
+        <div class="lg:col-span-2 surface rounded-xl p-6">
+          <div class="flex items-start justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <h3 class="h-display text-[20px]">Últimos 7 días</h3>
+              <p class="text-[12px] text-ink-faint mt-0.5">Facturación diaria</p>
+            </div>
+            <div class="flex items-center gap-4 text-[11px]">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-0.5" style="background: var(--ink);"></span>
+                <span class="text-ink-muted">Ventas ($)</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Chart ventas semana -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <h3 class="text-lg font-bold text-navy mb-4">Facturación últimos 7 días</h3>
-          <div class="relative h-64 w-full">
-            <Line
-              v-if="dashStore.ventasSemana.length > 0"
-              :data="ventasChartData"
-              :options="ventasChartOptions"
+          <!-- SVG custom minimalista -->
+          <div v-if="dashStore.ventasSemana.length === 0" class="h-[220px] grid place-items-center text-[12px] text-ink-faint">
+            Sin datos para mostrar
+          </div>
+          <svg
+            v-else
+            viewBox="0 0 700 220"
+            class="w-full h-[220px] text-ink"
+            preserveAspectRatio="none"
+          >
+            <!-- grid horizontal -->
+            <g stroke="var(--line)" stroke-width="1">
+              <line x1="40" y1="20" x2="700" y2="20"/>
+              <line x1="40" y1="70" x2="700" y2="70"/>
+              <line x1="40" y1="120" x2="700" y2="120"/>
+              <line x1="40" y1="170" x2="700" y2="170"/>
+            </g>
+
+            <!-- datos escalados -->
+            <g>
+              <template
+                v-for="(v, i) in dashStore.ventasSemana"
+                :key="i"
+              >
+                <!-- eje X labels -->
+                <text
+                  :x="40 + (i * (660 / Math.max(dashStore.ventasSemana.length - 1, 1)))"
+                  y="205"
+                  text-anchor="middle"
+                  font-family="Inter"
+                  font-size="11"
+                  fill="var(--ink-faint)"
+                >{{ v.dia }}</text>
+              </template>
+            </g>
+
+            <!-- Línea de ventas + área -->
+            <path
+              :d="(() => {
+                const vs = dashStore.ventasSemana
+                if (vs.length === 0) return ''
+                const max = Math.max(...vs.map(v => Number(v.total)), 1)
+                const step = 660 / Math.max(vs.length - 1, 1)
+                const points = vs.map((v, i) => {
+                  const x = 40 + i * step
+                  const y = 180 - (Number(v.total) / max) * 160
+                  return `${x},${y}`
+                })
+                return 'M' + points.join(' L')
+              })()"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linejoin="round"
             />
-            <div v-else class="flex items-center justify-center h-full">
-              <p class="text-navy/40">Sin datos de ventas esta semana</p>
-            </div>
-          </div>
+            <path
+              :d="(() => {
+                const vs = dashStore.ventasSemana
+                if (vs.length === 0) return ''
+                const max = Math.max(...vs.map(v => Number(v.total)), 1)
+                const step = 660 / Math.max(vs.length - 1, 1)
+                const pts = vs.map((v, i) => {
+                  const x = 40 + i * step
+                  const y = 180 - (Number(v.total) / max) * 160
+                  return `${x},${y}`
+                })
+                return 'M' + pts.join(' L') + ` L${40 + (vs.length - 1) * step},190 L40,190 Z`
+              })()"
+              fill="currentColor"
+              opacity="0.06"
+            />
+          </svg>
         </div>
-      </div>
 
-      <!-- ================== Resumen compacto ================== -->
-      <div class="bg-navy/95 rounded-lg text-white flex flex-col sm:flex-row gap-0 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
-        <div class="flex-1 flex items-center gap-2 px-4 py-2.5">
-          <i class="pi pi-box text-mauve text-sm" aria-hidden="true"></i>
-          <span class="text-[11px] uppercase tracking-wide text-lavanda-medio">Inventario:</span>
-          <span v-if="productoMenorStock" class="text-xs font-medium">
-            {{ productoMenorStock.nombre }} —
-            <span class="font-bold text-mauve">{{ productoMenorStock.stock }} uds</span>
-          </span>
-          <span v-else class="text-xs text-lavanda-medio/70">Agrega productos</span>
-        </div>
-        <div class="flex-1 flex items-center gap-2 px-4 py-2.5">
-          <i class="pi pi-chart-bar text-mauve text-sm" aria-hidden="true"></i>
-          <span class="text-[11px] uppercase tracking-wide text-lavanda-medio">Actividad:</span>
-          <span v-if="dashStore.stats.pedidos_mes > 0" class="text-xs font-medium">
-            {{ dashStore.stats.pedidos_mes }} pedidos · <span class="font-bold text-mauve">${{ formatMoney(dashStore.stats.ventas_mes) }}</span>
-          </span>
-          <span v-else class="text-xs text-lavanda-medio/70">Sin pedidos este mes</span>
-        </div>
-      </div>
-
-      <!-- ================== Canales ================== -->
-      <div v-if="dashStore.canalesStats.length > 0" class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-        <h3 class="text-lg font-bold text-navy mb-4">Pedidos por Canal de Origen</h3>
-        <div class="flex flex-col md:flex-row items-center gap-6">
-          <div class="relative h-56 w-56 shrink-0">
-            <Doughnut :data="canalesChartData" :options="canalesChartOptions" />
-          </div>
-          <div class="flex-1 grid grid-cols-2 gap-3 w-full">
+        <!-- Pipeline -->
+        <div class="surface rounded-xl p-6">
+          <h3 class="h-display text-[20px] mb-1">Pipeline</h3>
+          <p class="text-[12px] text-ink-faint mb-5">
+            Estado de los {{ pedidosStore.pedidos.length }} pedidos
+          </p>
+          <div class="space-y-3">
             <div
-              v-for="(canal, idx) in dashStore.canalesStats"
-              :key="canal.canal"
-              class="flex items-center gap-2 bg-lavanda/30 p-2 rounded-lg"
+              v-for="item in pipelineItems"
+              :key="item.key"
+              :class="['group', item.count === 0 ? 'opacity-50' : 'cursor-pointer']"
             >
-              <span
-                class="w-3 h-3 rounded-full shrink-0"
-                :style="{ backgroundColor: CANAL_COLORES[idx] || '#C8C8E9' }"
-              ></span>
-              <span class="text-sm text-navy font-medium truncate">{{ canal.canal }}</span>
-              <span class="text-sm font-bold text-mauve ml-auto">{{ canal.total }}</span>
+              <div class="flex items-baseline justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="state-dot" :class="item.dot"></span>
+                  <span class="text-[13px] font-medium">{{ item.label }}</span>
+                </div>
+                <span class="font-mono text-[13px] tabular">{{ item.count }}</span>
+              </div>
+              <div class="h-1 bg-paper-alt rounded-full overflow-hidden">
+                <div class="h-full" :class="item.dot" :style="{ width: item.pct + '%' }"></div>
+              </div>
             </div>
           </div>
+          <button
+            @click="router.push('/pedidos')"
+            class="mt-5 w-full text-center text-[12px] font-medium py-2 rounded-md border hairline hover:bg-paper-alt transition"
+          >
+            Ver todos los pedidos →
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom row: producto estrella + actividad -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Producto estrella -->
+        <div class="surface rounded-xl p-6">
+          <h3 class="h-display text-[20px] mb-1">Producto estrella</h3>
+          <p class="text-[12px] text-ink-faint mb-5">Ranking del período</p>
+          <div v-if="productoEstrella.length === 0" class="text-[12px] text-ink-faint text-center py-6">
+            Aún no hay suficiente data
+          </div>
+          <div v-else class="space-y-4">
+            <div
+              v-for="(p, i) in productoEstrella"
+              :key="p.id"
+              class="flex items-center gap-3"
+              :style="{ opacity: 1 - i * 0.2 }"
+            >
+              <span class="h-display-italic text-[22px] text-ink-faint w-6">{{ i + 1 }}</span>
+              <div class="flex-1 min-w-0">
+                <div class="text-[13px] font-medium truncate">{{ p.nombre }}</div>
+                <div class="text-[11px] text-ink-faint tabular font-mono">
+                  {{ p.unidades }} unidad{{ p.unidades === 1 ? '' : 'es' }} · ${{ formatMoney(p.ventas) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actividad reciente -->
+        <div class="lg:col-span-2 surface rounded-xl p-6">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h3 class="h-display text-[20px]">Actividad</h3>
+              <p class="text-[12px] text-ink-faint mt-0.5">Últimos cambios de estado</p>
+            </div>
+            <span class="text-[11px] text-ink-muted flex items-center gap-1">
+              <span class="w-1.5 h-1.5 dot-emerald rounded-full animate-pulse"></span>
+              Auto
+            </span>
+          </div>
+
+          <div v-if="actividad.length === 0" class="text-[12px] text-ink-faint text-center py-6">
+            Sin actividad reciente
+          </div>
+          <ol v-else class="space-y-0 divide-y hairline">
+            <li
+              v-for="(item, i) in actividad"
+              :key="i"
+              class="py-3 flex items-start gap-4"
+            >
+              <span class="text-[11px] tabular font-mono text-ink-faint w-14 pt-0.5">
+                {{ formatRelative(item.ts) }}
+              </span>
+              <span class="state-dot mt-1.5" :class="item.dotClass"></span>
+              <div class="flex-1 text-[13px]" v-html="item.html"></div>
+            </li>
+          </ol>
         </div>
       </div>
     </template>

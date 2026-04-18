@@ -145,7 +145,7 @@ const shareLinkGeneral = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="px-8 py-8 space-y-5">
     <!-- Cabecera + filtros -->
     <div class="bg-white p-5 rounded-xl shadow-sm border border-lavanda-medio">
       <div class="flex items-start justify-between gap-4 flex-wrap">

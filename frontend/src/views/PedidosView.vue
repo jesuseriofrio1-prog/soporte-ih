@@ -230,7 +230,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="px-8 py-8 space-y-6">
+    <!-- Header de página -->
+    <div class="flex items-end justify-between mb-2 flex-wrap gap-4">
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-faint mb-2">
+          {{ pedidosStore.pedidos.length }} registros
+        </div>
+        <h1 class="h-display text-[40px] leading-none">Pedidos</h1>
+      </div>
+    </div>
+
     <PedidosFiltersBar
       :chips="chipsAntiguedad"
       v-model:filtroAntiguedad="filtroAntiguedad"
@@ -238,6 +248,7 @@ onMounted(() => {
       v-model:filtroEstado="filtroEstado"
       :productos="productosStore.productos"
       :sincronizando="sincronizando"
+      :pedidos="pedidosStore.pedidos"
       @sincronizar="sincronizarServientrega"
       @importar="routerInstance.push('/integraciones')"
       @nuevo-pedido="abrirModal"

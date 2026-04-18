@@ -147,70 +147,133 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="px-8 py-8">
     <!-- Header -->
-    <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-lavanda-medio">
-      <h3 class="text-xl font-bold text-navy">Inventario</h3>
-      <button
-        @click="abrirModalCrear"
-        class="bg-mauve text-white px-4 py-2 rounded-lg font-bold hover:bg-navy transition flex items-center gap-2 shadow-sm"
-      >
-        <i class="pi pi-plus"></i> Añadir Producto
-      </button>
-    </div>
-
-    <!-- Loading -->
-    <div v-if="store.loading" class="text-center py-12">
-      <i class="pi pi-spin pi-spinner text-4xl text-mauve"></i>
-      <p class="text-navy/60 mt-2">Cargando productos...</p>
-    </div>
-
-    <!-- Grid de productos -->
-    <div v-else class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
-      <div
-        v-for="producto in store.productos"
-        :key="producto.id"
-        class="bg-white p-5 rounded-xl border border-lavanda-medio shadow-sm flex flex-col items-center text-center cursor-pointer hover:shadow-md transition group"
-        @click="abrirModalEditar(producto)"
-      >
-        <!-- Icono -->
-        <div class="w-20 h-20 bg-lavanda rounded-full flex items-center justify-center text-mauve text-3xl mb-4 border-2 border-white shadow-inner">
-          <i :class="producto.icono || 'pi pi-box'"></i>
+    <div class="flex items-end justify-between mb-6 flex-wrap gap-4">
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-faint mb-2">
+          {{ store.productos.length }} productos · {{ store.productos.reduce((a, p) => a + p.stock, 0).toLocaleString() }} unidades en stock
         </div>
-
-        <!-- Info -->
-        <p class="font-bold text-navy text-lg mb-1">{{ producto.nombre }}</p>
-        <p class="text-sm text-navy/50 font-medium mb-3">{{ producto.slug }}</p>
-
-        <!-- Divider + datos -->
-        <div class="w-full flex justify-between border-t border-lavanda pt-3">
-          <span class="text-sm font-bold text-mauve">Stock: {{ producto.stock }}</span>
-          <span class="text-sm font-bold text-navy">${{ producto.precio.toFixed(2) }}</span>
-        </div>
-
-        <!-- Acciones -->
-        <div class="mt-3 flex gap-3 items-center">
-          <button
-            @click.stop="copiarLinkPublico(producto)"
-            class="text-xs font-bold text-mauve hover:underline flex items-center gap-1"
-            title="Copiar link del formulario público para enviar al cliente"
-          >
-            <i class="pi pi-link" aria-hidden="true"></i> Link pedido
-          </button>
-          <button
-            @click.stop="eliminar(producto)"
-            class="text-xs text-alerta/60 hover:text-alerta font-medium transition"
-          >
-            <i class="pi pi-trash"></i> Eliminar
-          </button>
-        </div>
+        <h1 class="h-display text-[40px] leading-none">Catálogo</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          @click="abrirModalCrear"
+          class="h-9 px-3 rounded-md text-[12px] font-medium hover:opacity-90 transition flex items-center gap-2"
+          style="background: var(--ink); color: var(--paper);"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 3v10M3 8h10" stroke-linecap="round"/>
+          </svg>
+          Añadir producto
+        </button>
       </div>
     </div>
 
-    <!-- Vacío -->
-    <div v-if="!store.loading && store.productos.length === 0" class="text-center py-12">
-      <i class="pi pi-box text-5xl text-lavanda-medio"></i>
-      <p class="text-navy/60 mt-3">No hay productos activos</p>
+    <!-- Loading -->
+    <div v-if="store.loading" class="surface rounded-xl p-16 text-center">
+      <div class="inline-block w-5 h-5 border-2 rounded-full animate-spin" style="border-color: var(--line); border-top-color: var(--accent);"></div>
+      <p class="text-[13px] text-ink-muted mt-3">Cargando productos…</p>
+    </div>
+
+    <!-- Empty -->
+    <div v-else-if="store.productos.length === 0" class="surface empty-pattern rounded-xl py-16 text-center">
+      <p class="text-[13px] text-ink-muted">No hay productos activos</p>
+    </div>
+
+    <!-- Grid de productos -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div
+        v-for="producto in store.productos"
+        :key="producto.id"
+        class="surface rounded-xl overflow-hidden group hover:shadow-md transition cursor-pointer"
+        @click="abrirModalEditar(producto)"
+      >
+        <!-- Imagen placeholder con gradiente rose -->
+        <div
+          class="aspect-[4/3] relative overflow-hidden"
+          style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft));"
+        >
+          <div class="absolute inset-0 grid place-items-center opacity-50">
+            <i
+              v-if="producto.icono"
+              :class="producto.icono"
+              class="text-6xl"
+              style="color: var(--accent);"
+            ></i>
+            <svg v-else class="w-24 h-24" style="color: var(--accent);" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1">
+              <circle cx="50" cy="50" r="30"/>
+              <circle cx="50" cy="50" r="15"/>
+            </svg>
+          </div>
+          <!-- Badge SKU -->
+          <div
+            class="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono tabular text-ink-muted"
+            style="background: var(--paper-elev);"
+          >
+            SKU: {{ producto.slug }}
+          </div>
+        </div>
+
+        <!-- Contenido -->
+        <div class="p-5">
+          <div class="flex items-start justify-between mb-3 gap-3">
+            <h3 class="h-display text-[20px] leading-tight truncate">{{ producto.nombre }}</h3>
+            <div class="text-right shrink-0">
+              <div class="h-display text-[22px] tabular leading-none">
+                ${{ Math.floor(producto.precio) }}.<span class="text-[14px]">{{ String(Number(producto.precio).toFixed(2)).split('.')[1] }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-4 text-[12px]">
+            <div>
+              <div class="text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1">Stock</div>
+              <div class="flex items-baseline gap-1">
+                <span class="h-display tabular text-[18px]">{{ producto.stock.toLocaleString() }}</span>
+                <span class="text-[10px] text-ink-faint">u.</span>
+              </div>
+            </div>
+            <div>
+              <div class="text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1">Estado</div>
+              <div class="flex items-baseline gap-1">
+                <span
+                  class="inline-flex items-center gap-1 text-[11px] font-medium"
+                  :class="producto.activo ? 'pill-emerald' : 'pill-rose'"
+                  style="padding: 2px 6px; border-radius: 4px;"
+                >
+                  <span class="state-dot" :class="producto.activo ? 'dot-emerald' : 'dot-rose'"></span>
+                  {{ producto.activo ? 'Activo' : 'Inactivo' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              @click.stop="copiarLinkPublico(producto)"
+              class="flex-1 h-8 rounded-md border hairline text-[11px] font-medium hover:bg-paper-alt transition"
+            >
+              Copiar link
+            </button>
+            <button
+              @click.stop="abrirModalEditar(producto)"
+              class="flex-1 h-8 rounded-md border hairline text-[11px] font-medium hover:bg-paper-alt transition"
+            >
+              Editar
+            </button>
+            <button
+              @click.stop="eliminar(producto)"
+              class="h-8 w-8 rounded-md border hairline grid place-items-center hover:bg-paper-alt transition"
+              title="Eliminar"
+            >
+              <svg class="w-3.5 h-3.5" style="color: var(--rose-dot);" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M3 4h10M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1m-5 0v9a1 1 0 001 1h4a1 1 0 001-1V4" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Modal crear/editar -->

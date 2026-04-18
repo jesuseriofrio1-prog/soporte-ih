@@ -92,7 +92,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="px-8 py-8 space-y-6">
     <!-- Header -->
     <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-lavanda-medio">
       <h3 class="text-xl font-bold text-navy">Administrar Tiendas</h3>

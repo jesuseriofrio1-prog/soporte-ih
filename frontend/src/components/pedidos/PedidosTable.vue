@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import PedidoStatusBadge from './PedidoStatusBadge.vue'
 import type { EstadoPedido, Pedido } from '../../services/pedidosService'
 import {
-  diasRetencion,
-  retencionColor,
-  retencionDotColor,
+  ESTADO_LABELS,
   filaAlerta,
   formatFecha,
 } from '../../composables/usePedidoEstado'
 
 /**
- * Tabla de pedidos. Toda la lógica de filtrado/ordenado vive en el padre;
- * aquí solo renderizamos y emitimos eventos.
+ * Tabla de pedidos con look minimal estilo rediseño v2:
+ *  - Hairlines, tipografía 13px, tabular nums para montos y teléfonos.
+ *  - Fila completa tintada ámbar si el pedido requiere atención.
+ *  - Acciones WA/eliminar aparecen en hover (row-actions).
  */
 
 defineProps<{
@@ -30,126 +29,195 @@ const emit = defineEmits<{
   'abrir-wa': [p: Pedido]
   'abrir-tracking': [guia: string]
 }>()
+
+// Mapeo de estado → clase pill para el badge inline.
+const ESTADO_PILL: Record<string, string> = {
+  PENDIENTE: 'pill-amber',
+  CONFIRMADO: 'pill-blue',
+  EN_PREPARACION: 'pill-blue',
+  ENVIADO: 'pill-blue',
+  EN_RUTA: 'pill-blue',
+  RETIRO_EN_AGENCIA: 'pill-blue',
+  NOVEDAD: 'pill-amber',
+  NO_ENTREGADO: 'pill-rose',
+  ENTREGADO: 'pill-emerald',
+  DEVUELTO: 'pill-rose',
+}
+
+const ESTADO_DOT: Record<string, string> = {
+  PENDIENTE: 'dot-amber',
+  CONFIRMADO: 'dot-blue',
+  EN_PREPARACION: 'dot-blue',
+  ENVIADO: 'dot-blue',
+  EN_RUTA: 'dot-blue',
+  RETIRO_EN_AGENCIA: 'dot-blue',
+  NOVEDAD: 'dot-amber',
+  NO_ENTREGADO: 'dot-rose',
+  ENTREGADO: 'dot-emerald',
+  DEVUELTO: 'dot-rose',
+}
+
+function diasDesde(iso: string): string {
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24))
+  return dias === 0 ? 'hoy' : `${dias}d`
+}
+
+function inicialesProducto(nombre: string | undefined): string {
+  if (!nombre) return '??'
+  const words = nombre.trim().split(/\s+/).slice(0, 2)
+  return words.map((w) => w[0]).join('').toUpperCase()
+}
 </script>
 
 <template>
-  <div v-if="loading" class="text-center py-12">
-    <i class="pi pi-spin pi-spinner text-4xl text-mauve"></i>
-    <p class="text-navy/60 mt-2">Cargando pedidos...</p>
+  <div v-if="loading" class="surface rounded-xl p-16 text-center">
+    <div class="inline-block w-5 h-5 border-2 rounded-full animate-spin" style="border-color: var(--line); border-top-color: var(--accent);"></div>
+    <p class="text-[13px] text-ink-muted mt-3">Cargando pedidos…</p>
   </div>
 
-  <div v-else class="bg-white rounded-xl shadow-sm border border-lavanda-medio overflow-x-auto">
-    <table class="w-full text-left min-w-[700px]">
-      <thead class="bg-lavanda-medio text-navy text-xs uppercase font-bold tracking-wider">
-        <tr>
-          <th class="p-4 cursor-pointer hover:bg-lavanda transition select-none" @click="emit('sort', 'fecha')">
+  <div v-else class="surface rounded-xl overflow-hidden">
+    <div v-if="empty" class="empty-pattern py-16 text-center">
+      <p class="text-[13px] text-ink-muted">No hay pedidos con estos filtros</p>
+    </div>
+
+    <table v-else class="w-full text-[13px]">
+      <thead>
+        <tr
+          class="border-b hairline text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold"
+          style="background: var(--paper-alt);"
+        >
+          <th class="py-2.5 pl-5 pr-2 text-left cursor-pointer hover:text-ink transition" @click="emit('sort', 'cliente')">
             <span class="flex items-center gap-1">
               Cliente / Fecha
-              <span class="text-base" :class="sortKey === 'fecha' ? 'opacity-100' : 'opacity-30'">{{ sortLabel('fecha') }}</span>
+              <span class="text-base" :class="sortKey === 'fecha' ? 'opacity-100' : 'opacity-30'">
+                {{ sortLabel('fecha') }}
+              </span>
             </span>
           </th>
-          <th class="p-4 cursor-pointer hover:bg-lavanda transition select-none" @click="emit('sort', 'monto')">
+          <th class="py-2.5 px-2 text-left cursor-pointer hover:text-ink transition" @click="emit('sort', 'producto')">
             <span class="flex items-center gap-1">
               Producto
-              <span class="text-base" :class="sortKey === 'monto' ? 'opacity-100' : 'opacity-30'">{{ sortLabel('monto') }}</span>
+              <span class="text-base" :class="sortKey === 'producto' ? 'opacity-100' : 'opacity-30'">
+                {{ sortLabel('producto') }}
+              </span>
             </span>
           </th>
-          <th class="p-4 cursor-pointer hover:bg-lavanda transition select-none" @click="emit('sort', 'destino')">
-            <span class="flex items-center gap-1">
-              Destino
-              <span class="text-base" :class="sortKey === 'destino' ? 'opacity-100' : 'opacity-30'">{{ sortLabel('destino') }}</span>
+          <th class="py-2.5 px-2 text-left cursor-pointer hover:text-ink transition" @click="emit('sort', 'destino')">Destino</th>
+          <th class="py-2.5 px-2 text-left cursor-pointer hover:text-ink transition" @click="emit('sort', 'estado')">Estado</th>
+          <th class="py-2.5 px-2 text-right cursor-pointer hover:text-ink transition" @click="emit('sort', 'monto')">
+            <span class="flex items-center justify-end gap-1">
+              Monto
+              <span class="text-base" :class="sortKey === 'monto' ? 'opacity-100' : 'opacity-30'">
+                {{ sortLabel('monto') }}
+              </span>
             </span>
           </th>
-          <th class="p-4 cursor-pointer hover:bg-lavanda transition select-none" @click="emit('sort', 'estado')">
-            <span class="flex items-center gap-1">
-              Estado
-              <span class="text-base" :class="sortKey === 'estado' ? 'opacity-100' : 'opacity-30'">{{ sortLabel('estado') }}</span>
-            </span>
-          </th>
-          <th class="p-4 text-center">Acción</th>
+          <th class="py-2.5 pl-2 pr-5 text-right w-24">Días</th>
         </tr>
       </thead>
-      <tbody class="text-sm divide-y divide-lavanda">
+      <tbody class="divide-y hairline">
         <tr
           v-for="pedido in pedidos"
           :key="pedido.id"
-          class="transition cursor-pointer"
-          :class="filaAlerta(pedido.estado, pedido.dias_en_agencia) ? 'bg-red-50' : 'hover:bg-lavanda/50'"
+          class="cursor-pointer transition"
+          :class="filaAlerta(pedido.estado, pedido.dias_en_agencia) ? 'surface-amber hover:opacity-90' : 'hover:bg-paper-alt'"
           @click="emit('abrir-detalle', pedido)"
         >
-          <td class="p-4">
-            <p class="font-bold text-navy">{{ pedido.cliente_nombre || pedido.clientes?.nombre || '—' }}</p>
-            <p class="text-xs text-navy/60">{{ pedido.cliente_telefono || pedido.clientes?.telefono || '—' }}</p>
-            <p class="text-xs text-navy/40 mt-1">
-              {{ formatFecha(pedido.created_at) }} ·
-              <button
-                @click.stop="emit('abrir-tracking', pedido.guia)"
-                class="text-mauve hover:underline font-medium"
+          <!-- Cliente + fecha + guía -->
+          <td class="py-3 pl-5 pr-2">
+            <div class="font-medium">
+              {{ pedido.cliente_nombre || pedido.clientes?.nombre || '—' }}
+            </div>
+            <div class="text-[11px] text-ink-faint tabular font-mono">
+              {{ pedido.cliente_telefono || pedido.clientes?.telefono || '—' }} · {{ formatFecha(pedido.created_at) }}
+            </div>
+            <button
+              @click.stop="emit('abrir-tracking', pedido.guia)"
+              class="text-[10px] font-mono mt-0.5 hover:underline"
+              style="color: var(--accent);"
+            >
+              {{ pedido.guia }}
+            </button>
+          </td>
+
+          <!-- Producto -->
+          <td class="py-3 px-2">
+            <div class="flex items-center gap-2">
+              <div
+                class="w-6 h-6 rounded grid place-items-center text-[9px] font-semibold shrink-0"
+                style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft)); color: var(--rose-fg);"
               >
-                {{ pedido.guia }}
-              </button>
-            </p>
-          </td>
-
-          <td class="p-4">
-            <span class="font-medium text-navy">{{ pedido.productos?.nombre || '—' }}</span>
-            <p class="text-xs text-navy/50">${{ Number(pedido.monto).toFixed(2) }}</p>
-          </td>
-
-          <td class="p-4">
-            <span
-              class="inline-block px-2 py-0.5 rounded text-xs font-bold mb-1"
-              :class="pedido.tipo_entrega === 'DOMICILIO' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'"
-            >
-              {{ pedido.tipo_entrega }}
-            </span>
-            <p class="text-xs text-navy/60 max-w-[180px] truncate">{{ pedido.direccion }}</p>
-          </td>
-
-          <td class="p-4" @click.stop>
-            <PedidoStatusBadge
-              :estado="pedido.estado"
-              :dias-en-agencia="pedido.dias_en_agencia"
-              @cambiar="(nuevo) => emit('cambiar-estado', pedido.id, nuevo)"
-            />
-            <div
-              v-if="pedido.retencion_inicio"
-              class="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border"
-              :class="retencionColor(diasRetencion(pedido.retencion_inicio))"
-            >
-              <span class="w-1.5 h-1.5 rounded-full" :class="retencionDotColor(diasRetencion(pedido.retencion_inicio))"></span>
-              Día {{ diasRetencion(pedido.retencion_inicio) }} / 8
+                {{ inicialesProducto(pedido.productos?.nombre) }}
+              </div>
+              <div class="min-w-0">
+                <div class="truncate">{{ pedido.productos?.nombre || '—' }}</div>
+                <div class="text-[11px] tabular font-mono text-ink-faint">
+                  ${{ Number(pedido.monto).toFixed(2) }}
+                </div>
+              </div>
             </div>
           </td>
 
-          <td class="p-4 text-center" @click.stop>
-            <div class="flex flex-col items-center gap-1">
-              <button
-                @click="emit('toggle-retencion', pedido)"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                :class="pedido.retencion_inicio
-                  ? 'bg-navy text-white hover:opacity-80'
-                  : 'border border-lavanda-medio text-navy hover:bg-lavanda'"
-              >
-                <i class="pi pi-clock" aria-hidden="true"></i>
-                {{ pedido.retencion_inicio ? 'Día ' + diasRetencion(pedido.retencion_inicio) : '8 días' }}
-              </button>
-              <button
-                v-if="pedido.cliente_telefono || pedido.clientes?.telefono"
-                @click="emit('abrir-wa', pedido)"
-                class="inline-flex items-center gap-1 bg-wa-green text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:opacity-90 transition"
-              >
-                <i class="pi pi-whatsapp"></i> WA
-              </button>
+          <!-- Destino -->
+          <td class="py-3 px-2">
+            <div class="text-[12px]">
+              {{ pedido.provincia || pedido.clientes?.ciudad || '—' }}
+            </div>
+            <div class="text-[11px] text-ink-faint truncate max-w-[180px]">
+              {{ pedido.direccion || '' }}
+            </div>
+          </td>
+
+          <!-- Estado -->
+          <td class="py-3 px-2" @click.stop>
+            <span
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium"
+              :class="ESTADO_PILL[pedido.estado] || 'pill-blue'"
+            >
+              <span class="state-dot" :class="ESTADO_DOT[pedido.estado] || 'dot-blue'"></span>
+              {{ ESTADO_LABELS[pedido.estado] || pedido.estado }}
+            </span>
+            <!-- Tipo entrega como hint secundario -->
+            <div class="text-[10px] text-ink-faint mt-1">{{ pedido.tipo_entrega }}</div>
+          </td>
+
+          <!-- Monto -->
+          <td class="py-3 px-2 text-right font-mono tabular">
+            ${{ Number(pedido.monto).toFixed(2) }}
+          </td>
+
+          <!-- Días + row actions -->
+          <td class="py-3 pl-2 pr-5 text-right">
+            <div class="flex items-center justify-end gap-2">
+              <span class="row-actions flex items-center gap-1">
+                <button
+                  v-if="pedido.cliente_telefono || pedido.clientes?.telefono"
+                  @click.stop="emit('abrir-wa', pedido)"
+                  class="w-6 h-6 grid place-items-center rounded hover:bg-paper-alt"
+                  title="WhatsApp"
+                >
+                  <svg class="w-3.5 h-3.5" style="color: var(--emerald-dot);" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 1a7 7 0 00-6.06 10.5L1 15l3.6-.94A7 7 0 108 1z"/>
+                  </svg>
+                </button>
+                <button
+                  @click.stop="emit('toggle-retencion', pedido)"
+                  class="w-6 h-6 grid place-items-center rounded hover:bg-paper-alt"
+                  title="Retención"
+                >
+                  <svg class="w-3.5 h-3.5" :class="pedido.retencion_inicio ? '' : 'text-ink-muted'" :style="pedido.retencion_inicio ? { color: 'var(--amber-dot)' } : {}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="8" cy="8" r="6"/>
+                    <path d="M8 4v4l3 2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </span>
+              <span class="text-[11px] text-ink-muted tabular font-mono">
+                {{ diasDesde(pedido.created_at) }}
+              </span>
             </div>
           </td>
         </tr>
       </tbody>
     </table>
-
-    <div v-if="empty" class="text-center py-12">
-      <i class="pi pi-truck text-5xl text-lavanda-medio"></i>
-      <p class="text-navy/60 mt-3">No hay pedidos con estos filtros</p>
-    </div>
   </div>
 </template>

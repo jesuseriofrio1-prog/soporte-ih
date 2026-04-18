@@ -1,42 +1,212 @@
 @import "tailwindcss";
 
 /* ================================
-   SKINNA — Tema personalizado
-   ================================ */
+   Soporte IH — Design system (redesign v2)
+   ================================
+   Tokens CSS con soporte dark mode. El accent rose es el default
+   pero cada tienda puede sobreescribirlo desde AppLayout vía JS
+   inyectando su color_primario como --accent en :root.
+*/
 
-@theme {
-  --color-navy: #030363;
-  --color-lavanda: #E6E6FB;
-  --color-lavanda-medio: #C8C8E9;
-  --color-mauve: #C49BC2;
+:root {
+  --paper: #fafaf9;
+  --paper-alt: #f5f5f4;
+  --paper-elev: #ffffff;
+  --ink: #0a0a0a;
+  --ink-soft: #262626;
+  --ink-muted: #525252;
+  --ink-faint: #a3a3a3;
+  --line: #e7e5e4;
+  --accent: #e11d48;
+  --accent-soft: #fecdd3;
+
+  --emerald-bg: #d1fae5;
+  --emerald-fg: #065f46;
+  --emerald-dot: #10b981;
+  --amber-bg: #fef3c7;
+  --amber-fg: #92400e;
+  --amber-dot: #f59e0b;
+  --amber-surface: rgba(254, 243, 199, 0.4);
+  --blue-bg: #dbeafe;
+  --blue-fg: #1e40af;
+  --blue-dot: #3b82f6;
+  --rose-bg: #fecdd3;
+  --rose-fg: #9f1239;
+  --rose-dot: #f43f5e;
+
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.04);
+  --shadow-md: 0 4px 20px rgba(10, 10, 10, 0.06);
+  --shadow-xl: 0 20px 60px rgba(10, 10, 10, 0.12);
+
+  /* Legacy aliases mientras migran componentes */
+  --color-navy: var(--ink);
+  --color-lavanda: var(--paper-alt);
+  --color-lavanda-medio: var(--line);
+  --color-mauve: var(--accent);
   --color-wa-green: #25D366;
-  --color-alerta: #EF4444;
+  --color-alerta: var(--rose-dot);
 }
 
-/* ================================
-   Estilos base
-   ================================ */
+:root.dark {
+  --paper: #0c0a09;
+  --paper-alt: #1c1917;
+  --paper-elev: #1c1917;
+  --ink: #fafaf9;
+  --ink-soft: #e7e5e4;
+  --ink-muted: #a8a29e;
+  --ink-faint: #78716c;
+  --line: #292524;
+  --accent: #fb7185;
+  --accent-soft: #4c1d25;
+
+  --emerald-bg: rgba(16, 185, 129, 0.15);
+  --emerald-fg: #6ee7b7;
+  --emerald-dot: #10b981;
+  --amber-bg: rgba(245, 158, 11, 0.15);
+  --amber-fg: #fcd34d;
+  --amber-dot: #f59e0b;
+  --amber-surface: rgba(245, 158, 11, 0.08);
+  --blue-bg: rgba(59, 130, 246, 0.15);
+  --blue-fg: #93c5fd;
+  --blue-dot: #3b82f6;
+  --rose-bg: rgba(244, 63, 94, 0.15);
+  --rose-fg: #fda4af;
+  --rose-dot: #f43f5e;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* Registrar tokens en Tailwind v4 para que funcionen clases como
+   text-ink, bg-paper, border-line, text-ink-muted, etc. */
+@theme {
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-paper: var(--paper);
+  --color-paper-alt: var(--paper-alt);
+  --color-paper-elev: var(--paper-elev);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
 
 html {
   color-scheme: light;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
+html.dark { color-scheme: dark; }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-feature-settings: 'cv11', 'ss03', 'cv02';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #E6E6FB;
-  color: #030363;
 }
 
-#app {
-  min-height: 100vh;
+#app { min-height: 100vh; }
+
+/* ────── Utilidades del design system ────── */
+
+.tabular { font-variant-numeric: tabular-nums; }
+.hairline { border-color: var(--line); }
+
+.pill-emerald { background: var(--emerald-bg); color: var(--emerald-fg); }
+.pill-amber   { background: var(--amber-bg);   color: var(--amber-fg);   }
+.pill-blue    { background: var(--blue-bg);    color: var(--blue-fg);    }
+.pill-rose    { background: var(--rose-bg);    color: var(--rose-fg);    }
+.surface-amber { background: var(--amber-surface); }
+
+.dot-emerald { background: var(--emerald-dot); }
+.dot-amber   { background: var(--amber-dot); }
+.dot-blue    { background: var(--blue-dot); }
+.dot-rose    { background: var(--rose-dot); }
+.dot-stone   { background: var(--ink-faint); }
+
+.state-dot {
+  width: 6px; height: 6px; border-radius: 999px; display: inline-block;
 }
 
-/* ================================
-   PrimeVue — Forzar light mode
-   ================================ */
+.thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+
+.row-actions { opacity: 0; transition: opacity 0.12s ease; }
+tr:hover .row-actions,
+.row-parent:hover .row-actions { opacity: 1; }
+
+.h-display {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.h-display-italic {
+  font-family: 'Inter', sans-serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.surface {
+  background: var(--paper-elev);
+  border: 1px solid var(--line);
+}
+
+.nav-item {
+  position: relative;
+  color: var(--ink-soft);
+}
+.nav-item:hover { background: var(--paper-alt); }
+.nav-item.active { color: var(--ink); font-weight: 600; }
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.accent-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+kbd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--paper-elev);
+  color: var(--ink-muted);
+}
+
+.empty-pattern {
+  background-image: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0);
+  background-size: 16px 16px;
+}
+
+@keyframes sih-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-fade { animation: sih-fade 0.18s ease-out; }
+
+/* ────── Overrides PrimeVue ────── */
 
 .p-dialog,
 .p-dialog-content,
@@ -45,30 +215,30 @@ body {
 .p-popover,
 .p-select-overlay,
 .p-dropdown-panel {
-  color-scheme: light !important;
-  background-color: #ffffff !important;
-  color: #030363 !important;
+  background-color: var(--paper-elev) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
 }
 
-.p-dialog-header {
-  background-color: var(--color-navy, #030363) !important;
-  color: #ffffff !important;
-}
-
-.p-dialog-close-button {
-  color: #ffffff !important;
-}
-
+.p-dialog-header,
 .p-drawer .p-drawer-header {
-  background-color: var(--color-navy, #030363) !important;
-  color: #ffffff !important;
+  background-color: var(--paper-elev) !important;
+  color: var(--ink) !important;
+  border-bottom: 1px solid var(--line) !important;
 }
 
+.p-dialog-close-button,
 .p-drawer .p-drawer-close-button {
-  color: #ffffff !important;
+  color: var(--ink-muted) !important;
 }
 
-/* SweetAlert2 — siempre por encima de todo */
-.swal2-container {
-  z-index: 99999 !important;
+.swal2-container { z-index: 99999 !important; }
+
+:root.dark input[type="checkbox"] {
+  background: var(--paper-alt);
+  border-color: var(--line);
+}
+:root.dark input::placeholder,
+:root.dark textarea::placeholder {
+  color: var(--ink-faint);
 }

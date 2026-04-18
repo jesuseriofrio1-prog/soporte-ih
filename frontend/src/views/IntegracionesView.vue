@@ -169,7 +169,7 @@ const totalProcesado = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="px-8 py-8 space-y-6">
     <!-- Encabezado -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
       <div class="flex items-start gap-3">
