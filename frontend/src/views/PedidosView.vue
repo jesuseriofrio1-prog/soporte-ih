@@ -635,6 +635,14 @@ onMounted(() => {
             <span class="hidden md:inline">{{ sincronizando ? 'Sincronizando...' : 'Sincronizar' }}</span>
           </button>
           <button
+            @click="routerInstance.push('/integraciones')"
+            class="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
+            title="Importar pedidos desde Rocket Ecuador"
+          >
+            <i class="pi pi-file-excel" aria-hidden="true"></i>
+            <span class="hidden md:inline">Importar Rocket</span>
+          </button>
+          <button
             @click="abrirModal"
             class="bg-mauve text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
           >
