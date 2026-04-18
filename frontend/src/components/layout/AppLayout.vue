@@ -166,6 +166,8 @@ const storagePorcentaje = computed(() => storage.value?.usage_percent ?? 0)
 
         <button
           @click="tiendaMenuOpen = !tiendaMenuOpen"
+          :aria-expanded="tiendaMenuOpen"
+          aria-label="Cambiar tienda activa"
           class="w-full group flex items-center justify-between px-2 py-1.5 -mx-2 rounded-md hover:bg-paper-alt transition"
         >
           <div class="flex items-center gap-2 min-w-0">
@@ -253,10 +255,11 @@ const storagePorcentaje = computed(() => storage.value?.usage_percent ?? 0)
           </div>
           <div class="h-1 bg-paper-alt rounded-full overflow-hidden">
             <div
-              class="h-full"
+              v-if="storagePorcentaje > 0"
+              class="h-full transition-all"
               :class="storagePorcentaje >= 90 ? 'dot-rose' : storagePorcentaje >= 70 ? 'dot-amber' : ''"
               :style="{
-                width: Math.max(storagePorcentaje, 0.5) + '%',
+                width: storagePorcentaje + '%',
                 background: storagePorcentaje >= 70 ? undefined : 'var(--ink)',
               }"
             ></div>
@@ -318,7 +321,8 @@ const storagePorcentaje = computed(() => storage.value?.usage_percent ?? 0)
         <button
           @click="toggleTheme"
           class="w-8 h-8 rounded-md hover:bg-paper-alt grid place-items-center"
-          title="Cambiar tema"
+          :aria-label="theme === 'light' ? 'Activar tema oscuro' : 'Activar tema claro'"
+          :title="theme === 'light' ? 'Modo oscuro' : 'Modo claro'"
         >
           <svg v-if="theme === 'light'" class="w-4 h-4 text-ink-soft" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M13.5 9a5.5 5.5 0 01-6.5-6.5 5.5 5.5 0 106.5 6.5z"/>

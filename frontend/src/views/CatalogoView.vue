@@ -354,7 +354,7 @@ onMounted(() => {
             placeholder="fas fa-tint"
             class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-mauve transition"
           />
-          <p class="text-xs text-navy/40 mt-1">Clase FontAwesome o PrimeIcon (ej: fas fa-tint, pi pi-box)</p>
+          <p class="text-[11px] text-ink-faint mt-1">Opcional. Emoji o clase CSS (ej: 💧, fas fa-tint).</p>
         </div>
 
         <!-- Botones -->

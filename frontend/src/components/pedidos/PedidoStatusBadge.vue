@@ -16,24 +16,29 @@ const badgeRef = ref<HTMLElement | null>(null)
 const dropdownStyle = ref({ top: '0px', left: '0px' })
 let closeTimer: ReturnType<typeof setTimeout> | null = null
 
-const estilos: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  PENDIENTE: { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-500', label: 'Pendiente' },
-  CONFIRMADO: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500', label: 'Confirmado' },
-  EN_PREPARACION: { bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500', label: 'En Preparación' },
-  ENVIADO: { bg: 'bg-cyan-100', text: 'text-cyan-700', dot: 'bg-cyan-500', label: 'Enviado' },
-  EN_RUTA: { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500', label: 'En Ruta' },
-  NOVEDAD: { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500', label: 'Novedad' },
-  RETIRO_EN_AGENCIA: { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500', label: 'Retiro en Agencia' },
-  ENTREGADO: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500', label: 'Entregado' },
-  NO_ENTREGADO: { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500', label: 'No Entregado' },
-  DEVUELTO: { bg: 'bg-red-200', text: 'text-red-800', dot: 'bg-red-800', label: 'Devuelto' },
+/**
+ * Mapa de estados → pills semánticos del design system v2.
+ * Todos los estados se categorizan en 5 semánticas: emerald (entregado),
+ * blue (en progreso/tránsito), amber (requiere atención), rose (fallidos),
+ * stone (pendiente/neutro).
+ */
+const estilos: Record<string, { pill: string; dot: string; label: string }> = {
+  PENDIENTE:         { pill: 'pill-amber',   dot: 'dot-amber',   label: 'Pendiente' },
+  CONFIRMADO:        { pill: 'pill-blue',    dot: 'dot-blue',    label: 'Confirmado' },
+  EN_PREPARACION:    { pill: 'pill-blue',    dot: 'dot-blue',    label: 'En Preparación' },
+  ENVIADO:           { pill: 'pill-blue',    dot: 'dot-blue',    label: 'Enviado' },
+  EN_RUTA:           { pill: 'pill-blue',    dot: 'dot-blue',    label: 'En Ruta' },
+  NOVEDAD:           { pill: 'pill-amber',   dot: 'dot-amber',   label: 'Novedad' },
+  RETIRO_EN_AGENCIA: { pill: 'pill-blue',    dot: 'dot-blue',    label: 'Retiro en Agencia' },
+  ENTREGADO:         { pill: 'pill-emerald', dot: 'dot-emerald', label: 'Entregado' },
+  NO_ENTREGADO:      { pill: 'pill-rose',    dot: 'dot-rose',    label: 'No Entregado' },
+  DEVUELTO:          { pill: 'pill-rose',    dot: 'dot-rose',    label: 'Devuelto' },
 }
 
-const defaultEstilo = { bg: 'bg-sky-100', text: 'text-sky-700', dot: 'bg-sky-500', label: '' }
+const defaultEstilo = { pill: 'pill-blue', dot: 'dot-blue', label: '' }
 const estilo = computed(() => {
   const e = estilos[props.estado]
   if (e) return e
-  // Estado de Servientrega no predefinido — mostrar tal cual
   return { ...defaultEstilo, label: props.estado }
 })
 const transicionesDisponibles = computed(() =>
@@ -97,32 +102,34 @@ onBeforeUnmount(() => {
     <button
       ref="badgeRef"
       @click="toggleDropdown"
-      class="inline-flex items-center gap-1 px-2 py-1 rounded-full font-bold transition max-w-[220px] text-[10px] leading-tight"
+      class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition max-w-[220px] leading-tight"
       :class="[
-        estilo.bg,
-        estilo.text,
+        estilo.pill,
         esFinal ? 'cursor-default' : 'cursor-pointer hover:opacity-80',
       ]"
     >
+      <span class="state-dot" :class="estilo.dot"></span>
       {{ estilo.label }}
-      <i v-if="!esFinal" class="pi pi-chevron-down text-[10px]" aria-hidden="true"></i>
+      <svg v-if="!esFinal" class="w-2.5 h-2.5 opacity-70" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3 5l3 3 3-3" stroke-linecap="round"/>
+      </svg>
     </button>
 
-    <!-- Indicador de días en agencia -->
+    <!-- Indicador días en agencia -->
     <span
       v-if="estado === 'RETIRO_EN_AGENCIA' && diasEnAgencia !== undefined"
-      class="ml-1 text-xs font-bold"
-      :class="diasEnAgencia >= 6 ? 'text-alerta' : 'text-navy/50'"
+      class="ml-1 text-[11px] font-medium tabular font-mono"
+      :style="diasEnAgencia >= 6 ? { color: 'var(--rose-dot)' } : { color: 'var(--ink-faint)' }"
     >
-      Día {{ diasEnAgencia }} de 8
+      {{ diasEnAgencia }}/8d
     </span>
 
     <!-- Dropdown -->
     <Teleport to="body">
       <div
         v-if="dropdownOpen"
-        class="fixed bg-white rounded-lg shadow-xl border border-lavanda-medio min-w-[190px] py-1"
-        :style="{ top: dropdownStyle.top, left: dropdownStyle.left, zIndex: 9999 }"
+        class="fixed surface rounded-md min-w-[190px] py-1 thin-scroll"
+        :style="{ top: dropdownStyle.top, left: dropdownStyle.left, zIndex: 9999, boxShadow: 'var(--shadow-md)' }"
         @mouseenter="cancelClose"
         @mouseleave="scheduleClose"
       >
@@ -130,12 +137,9 @@ onBeforeUnmount(() => {
           v-for="opcion in transicionesDisponibles"
           :key="opcion"
           @click="seleccionar(opcion)"
-          class="w-full text-left px-3 py-2 text-xs font-medium hover:bg-lavanda transition flex items-center gap-2"
+          class="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-paper-alt transition flex items-center gap-2"
         >
-          <span
-            class="w-2 h-2 rounded-full shrink-0"
-            :class="estilos[opcion]?.dot || 'bg-gray-500'"
-          ></span>
+          <span class="state-dot" :class="estilos[opcion]?.dot || 'dot-stone'"></span>
           <span>{{ estilos[opcion]?.label || opcion }}</span>
         </button>
       </div>

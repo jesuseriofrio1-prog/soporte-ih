@@ -14,16 +14,22 @@ const editando = ref(false)
 const editId = ref<string | null>(null)
 const form = ref({
   nombre: '',
-  color_primario: '#030363',
-  color_secundario: '#C49BC2',
-  color_fondo: '#E6E6FB',
-  color_borde: '#C8C8E9',
+  color_primario: '#0a0a0a',
+  color_secundario: '#e11d48',
+  color_fondo: '#fafaf9',
+  color_borde: '#e7e5e4',
 })
 
 function abrirCrear() {
   editando.value = false
   editId.value = null
-  form.value = { nombre: '', color_primario: '#030363', color_secundario: '#C49BC2', color_fondo: '#E6E6FB', color_borde: '#C8C8E9' }
+  form.value = {
+    nombre: '',
+    color_primario: '#0a0a0a',
+    color_secundario: '#e11d48',
+    color_fondo: '#fafaf9',
+    color_borde: '#e7e5e4',
+  }
   modalVisible.value = true
 }
 
@@ -32,10 +38,10 @@ function abrirEditar(tienda: Tienda) {
   editId.value = tienda.id
   form.value = {
     nombre: tienda.nombre,
-    color_primario: tienda.color_primario || '#030363',
-    color_secundario: tienda.color_secundario || '#C49BC2',
-    color_fondo: tienda.color_fondo || '#E6E6FB',
-    color_borde: tienda.color_borde || '#C8C8E9',
+    color_primario: tienda.color_primario || '#0a0a0a',
+    color_secundario: tienda.color_secundario || '#e11d48',
+    color_fondo: tienda.color_fondo || '#fafaf9',
+    color_borde: tienda.color_borde || '#e7e5e4',
   }
   modalVisible.value = true
 }
@@ -92,157 +98,170 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="px-8 py-8 space-y-6">
+  <div class="px-8 py-8">
     <!-- Header -->
-    <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-lavanda-medio">
-      <h3 class="text-xl font-bold text-navy">Administrar Tiendas</h3>
+    <div class="flex items-end justify-between mb-6 flex-wrap gap-4">
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-faint mb-2">
+          {{ tiendaStore.tiendas.length }} tienda{{ tiendaStore.tiendas.length === 1 ? '' : 's' }}
+        </div>
+        <h1 class="h-display text-[40px] leading-none">Tiendas</h1>
+      </div>
       <button
         @click="abrirCrear"
-        class="bg-mauve text-white px-4 py-2 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2 shadow-sm"
+        class="h-9 px-3 rounded-md text-[12px] font-medium hover:opacity-90 transition flex items-center gap-2"
+        style="background: var(--ink); color: var(--paper);"
       >
-        <i class="pi pi-plus"></i> Nueva Tienda
+        <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 3v10M3 8h10" stroke-linecap="round"/>
+        </svg>
+        Nueva tienda
       </button>
     </div>
 
-    <!-- Grid de tiendas -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+    <!-- Grid -->
+    <div v-if="tiendaStore.tiendas.length === 0" class="surface empty-pattern rounded-xl py-16 text-center">
+      <p class="text-[13px] text-ink-muted">No hay tiendas creadas</p>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
       <div
         v-for="tienda in tiendaStore.tiendas"
         :key="tienda.id"
-        class="bg-white p-5 rounded-xl border border-lavanda-medio shadow-sm hover:shadow-md transition"
-        :class="{ 'opacity-50': !tienda.estado }"
+        class="surface rounded-xl p-5 transition hover:shadow-md"
+        :class="{ 'opacity-60': !tienda.estado }"
       >
-        <!-- Barra de colores -->
-        <div class="flex gap-1 mb-4 h-2 rounded-full overflow-hidden">
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_primario }"></div>
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_secundario }"></div>
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_fondo }"></div>
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_borde }"></div>
+        <!-- Barra de colores de la tienda -->
+        <div class="flex gap-1 mb-4 h-1.5 rounded-full overflow-hidden">
+          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_primario || 'var(--ink)' }"></div>
+          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_secundario || 'var(--accent)' }"></div>
+          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_fondo || 'var(--paper-alt)' }"></div>
+          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_borde || 'var(--line)' }"></div>
         </div>
 
-        <div class="flex items-start justify-between">
-          <div>
-            <h4 class="text-lg font-bold text-navy">{{ tienda.nombre }}</h4>
-            <p class="text-xs text-navy/50 mt-1">Creada: {{ formatFecha(tienda.created_at) }}</p>
+        <div class="flex items-start justify-between mb-3">
+          <div class="min-w-0">
+            <h4 class="h-display text-[20px] leading-tight truncate">{{ tienda.nombre }}</h4>
+            <p class="text-[11px] text-ink-faint tabular font-mono mt-1">
+              Creada {{ formatFecha(tienda.created_at) }} · /p/{{ tienda.slug }}
+            </p>
           </div>
           <span
-            class="px-2 py-0.5 rounded-full text-[10px] font-bold"
-            :class="tienda.estado ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold shrink-0"
+            :class="tienda.estado ? 'pill-emerald' : 'pill-rose'"
           >
+            <span class="state-dot" :class="tienda.estado ? 'dot-emerald' : 'dot-rose'"></span>
             {{ tienda.estado ? 'Activa' : 'Inactiva' }}
           </span>
         </div>
 
-        <!-- Indicador tienda activa -->
-        <div v-if="tienda.id === tiendaStore.tiendaActivaId" class="mt-3 flex items-center gap-1 text-xs text-mauve font-bold">
-          <i class="pi pi-check-circle"></i> Tienda seleccionada
+        <!-- Indicador activa -->
+        <div v-if="tienda.id === tiendaStore.tiendaActivaId" class="mb-3 flex items-center gap-1.5 text-[11px] font-medium" style="color: var(--accent);">
+          <span class="state-dot" style="background: var(--accent);"></span>
+          Tienda seleccionada
         </div>
 
         <!-- Acciones -->
-        <div class="flex gap-2 mt-4 pt-3 border-t border-lavanda">
+        <div class="flex gap-2 pt-3 border-t hairline">
           <button
+            v-if="tienda.id !== tiendaStore.tiendaActivaId"
             @click="tiendaStore.setTiendaActiva(tienda.id)"
-            class="px-3 py-1.5 text-xs font-bold rounded-lg transition"
-            :class="tienda.id === tiendaStore.tiendaActivaId
-              ? 'bg-navy text-white'
-              : 'border border-lavanda-medio text-navy hover:bg-lavanda'"
+            class="flex-1 h-8 rounded-md border hairline text-[11px] font-medium hover:bg-paper-alt transition"
           >
-            {{ tienda.id === tiendaStore.tiendaActivaId ? 'Seleccionada' : 'Seleccionar' }}
+            Seleccionar
           </button>
           <button
             @click="abrirEditar(tienda)"
-            class="px-3 py-1.5 text-xs font-bold border border-lavanda-medio rounded-lg text-navy hover:bg-lavanda transition"
+            class="flex-1 h-8 rounded-md border hairline text-[11px] font-medium hover:bg-paper-alt transition"
           >
-            <i class="pi pi-pencil"></i> Editar
+            Editar
           </button>
           <button
             @click="toggleEstado(tienda)"
-            class="px-3 py-1.5 text-xs font-bold rounded-lg transition"
-            :class="tienda.estado
-              ? 'text-alerta border border-alerta/30 hover:bg-red-50'
-              : 'text-green-600 border border-green-200 hover:bg-green-50'"
+            class="h-8 px-3 rounded-md border hairline text-[11px] font-medium hover:bg-paper-alt transition"
+            :style="tienda.estado ? { color: 'var(--rose-dot)' } : { color: 'var(--emerald-dot)' }"
           >
             {{ tienda.estado ? 'Desactivar' : 'Activar' }}
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- Vacío -->
-    <div v-if="tiendaStore.tiendas.length === 0" class="text-center py-12">
-      <i class="pi pi-shop text-5xl text-lavanda-medio"></i>
-      <p class="text-navy/60 mt-3">No hay tiendas creadas</p>
+      <!-- Card añadir tienda -->
+      <button
+        @click="abrirCrear"
+        class="rounded-xl bg-transparent p-8 flex flex-col items-center justify-center gap-3 transition min-h-[180px] text-ink-faint hover:text-ink"
+        style="border: 2px dashed var(--line);"
+      >
+        <div class="w-12 h-12 rounded-full surface grid place-items-center">
+          <svg class="w-5 h-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M10 4v12M4 10h12" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="h-display text-[18px]">Nueva tienda</div>
+      </button>
     </div>
 
     <!-- Modal crear/editar -->
     <Dialog
       v-model:visible="modalVisible"
-      :header="editando ? 'Editar Tienda' : 'Nueva Tienda'"
+      :header="editando ? 'Editar tienda' : 'Nueva tienda'"
       modal
       :style="{ width: '420px' }"
       :pt="{
-        root: { class: 'border border-lavanda-medio rounded-xl' },
-        header: { class: 'bg-navy text-white rounded-t-xl p-4' },
-        title: { class: 'font-bold text-lg' },
+        root: { class: 'rounded-xl overflow-hidden' },
         content: { class: 'p-6' },
-        headerActions: { class: 'text-white' },
       }"
     >
       <form @submit.prevent="guardar" class="space-y-4">
         <div>
-          <label class="block text-sm font-bold text-navy mb-1">Nombre de la tienda *</label>
+          <label class="block text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1.5">
+            Nombre de la tienda
+          </label>
           <input
             v-model="form.nombre"
             type="text"
             placeholder="Mi Tienda"
-            class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-mauve transition"
+            class="w-full px-3 py-2 border hairline rounded-md bg-paper-alt text-[13px] text-ink focus:outline-none focus:border-accent transition"
           />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-bold text-navy mb-1">Sidebar / Textos</label>
+          <div v-for="field in [
+            { key: 'color_primario', label: 'Primario (accent)' },
+            { key: 'color_secundario', label: 'Secundario' },
+            { key: 'color_fondo', label: 'Fondo' },
+            { key: 'color_borde', label: 'Borde' },
+          ]" :key="field.key">
+            <label class="block text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1.5">
+              {{ field.label }}
+            </label>
             <div class="flex items-center gap-2">
-              <input v-model="form.color_primario" type="color" class="w-8 h-8 rounded cursor-pointer border-0" />
-              <span class="text-[10px] text-navy/50">{{ form.color_primario }}</span>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-navy mb-1">Botones / Acento</label>
-            <div class="flex items-center gap-2">
-              <input v-model="form.color_secundario" type="color" class="w-8 h-8 rounded cursor-pointer border-0" />
-              <span class="text-[10px] text-navy/50">{{ form.color_secundario }}</span>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-navy mb-1">Fondo</label>
-            <div class="flex items-center gap-2">
-              <input v-model="form.color_fondo" type="color" class="w-8 h-8 rounded cursor-pointer border-0" />
-              <span class="text-[10px] text-navy/50">{{ form.color_fondo }}</span>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-navy mb-1">Bordes</label>
-            <div class="flex items-center gap-2">
-              <input v-model="form.color_borde" type="color" class="w-8 h-8 rounded cursor-pointer border-0" />
-              <span class="text-[10px] text-navy/50">{{ form.color_borde }}</span>
+              <input
+                v-model="form[field.key as 'color_primario' | 'color_secundario' | 'color_fondo' | 'color_borde']"
+                type="color"
+                class="w-8 h-8 rounded cursor-pointer border-0"
+              />
+              <span class="text-[11px] font-mono tabular text-ink-faint">
+                {{ form[field.key as 'color_primario' | 'color_secundario' | 'color_fondo' | 'color_borde'] }}
+              </span>
             </div>
           </div>
         </div>
 
-        <div class="flex justify-end gap-3 pt-2">
+        <div class="flex justify-end gap-2 pt-2">
           <button
             type="button"
             @click="modalVisible = false"
-            class="px-4 py-2 rounded-lg font-bold border border-lavanda-medio text-navy hover:bg-lavanda transition"
+            class="h-9 px-3 rounded-md border hairline text-[12px] font-medium hover:bg-paper-alt transition"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            class="px-6 py-2 rounded-lg font-bold bg-mauve text-white hover:opacity-90 transition shadow-sm"
+            class="h-9 px-4 rounded-md text-[12px] font-medium hover:opacity-90 transition"
+            style="background: var(--ink); color: var(--paper);"
           >
-            {{ editando ? 'Guardar' : 'Crear Tienda' }}
+            {{ editando ? 'Guardar cambios' : 'Crear tienda' }}
           </button>
         </div>
       </form>

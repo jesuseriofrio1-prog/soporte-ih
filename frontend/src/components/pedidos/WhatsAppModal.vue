@@ -70,16 +70,16 @@ function enviar() {
 
 /** Estilo del badge de estado en el resumen */
 const estadoEstilos: Record<string, string> = {
-  PENDIENTE: 'bg-gray-100 text-gray-700',
-  CONFIRMADO: 'bg-blue-100 text-blue-700',
-  EN_PREPARACION: 'bg-indigo-100 text-indigo-700',
-  ENVIADO: 'bg-cyan-100 text-cyan-700',
-  EN_RUTA: 'bg-yellow-100 text-yellow-700',
-  NOVEDAD: 'bg-orange-100 text-orange-700',
-  RETIRO_EN_AGENCIA: 'bg-purple-100 text-purple-700',
-  ENTREGADO: 'bg-green-100 text-green-700',
-  NO_ENTREGADO: 'bg-red-100 text-red-700',
-  DEVUELTO: 'bg-red-200 text-red-800',
+  PENDIENTE: 'pill-amber',
+  CONFIRMADO: 'pill-blue',
+  EN_PREPARACION: 'pill-blue',
+  ENVIADO: 'pill-blue',
+  EN_RUTA: 'pill-blue',
+  NOVEDAD: 'pill-amber',
+  RETIRO_EN_AGENCIA: 'pill-blue',
+  ENTREGADO: 'pill-emerald',
+  NO_ENTREGADO: 'pill-rose',
+  DEVUELTO: 'pill-rose',
 }
 </script>
 
@@ -90,33 +90,32 @@ const estadoEstilos: Record<string, string> = {
     modal
     :style="{ width: '520px' }"
     :pt="{
-      root: { class: 'border border-lavanda-medio rounded-xl' },
-      header: { class: 'bg-wa-green text-white rounded-t-xl p-4' },
-      title: { class: 'font-bold text-lg' },
+      root: { class: 'rounded-xl overflow-hidden' },
       content: { class: 'p-6' },
-      headerActions: { class: 'text-white' },
     }"
   >
     <!-- Info del pedido -->
-    <div class="bg-lavanda/50 rounded-lg p-3 mb-4 flex items-center justify-between">
-      <div>
-        <p class="font-bold text-navy text-sm">{{ nombre }}</p>
-        <p class="text-xs text-navy/60">{{ telefono }} · {{ producto }}</p>
+    <div class="surface rounded-md p-3 mb-4 flex items-center justify-between">
+      <div class="min-w-0">
+        <p class="font-medium text-[13px] truncate">{{ nombre }}</p>
+        <p class="text-[11px] tabular font-mono text-ink-faint">{{ telefono }} · {{ producto }}</p>
       </div>
       <span
-        class="px-2 py-1 rounded-full text-xs font-bold"
-        :class="estadoEstilos[estado] || 'bg-gray-100 text-gray-700'"
+        class="px-2 py-0.5 rounded text-[11px] font-medium shrink-0"
+        :class="estadoEstilos[estado] || 'pill-blue'"
       >
-        {{ estado.replace(/_/g, ' ') }}
+        {{ estado.replace(/_/g, ' ').toLowerCase() }}
       </span>
     </div>
 
     <!-- Selector de plantilla -->
     <div class="mb-4">
-      <label class="block text-sm font-bold text-navy mb-1">Plantilla de mensaje</label>
+      <label class="block text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1.5">
+        Plantilla de mensaje
+      </label>
       <select
         v-model="plantillaSeleccionada"
-        class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-wa-green transition"
+        class="w-full px-3 py-2 border hairline rounded-md bg-paper-alt text-[13px] text-ink focus:outline-none focus:border-accent transition"
       >
         <option v-for="[key, label] in plantillasOpciones" :key="key" :value="key">
           {{ label }}
@@ -126,28 +125,35 @@ const estadoEstilos: Record<string, string> = {
 
     <!-- Textarea editable -->
     <div class="mb-4">
-      <label class="block text-sm font-bold text-navy mb-1">Mensaje</label>
+      <label class="block text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1.5">
+        Mensaje
+      </label>
       <textarea
         v-model="mensajeTexto"
         rows="8"
-        class="w-full px-4 py-3 border border-lavanda-medio rounded-lg bg-white text-navy text-sm leading-relaxed focus:outline-none focus:border-wa-green transition resize-none"
+        class="w-full px-3 py-2.5 border hairline rounded-md text-[13px] text-ink leading-relaxed focus:outline-none focus:border-accent transition resize-none"
+        style="background: var(--paper-elev);"
       ></textarea>
-      <p class="text-xs text-navy/40 mt-1">Puedes editar el mensaje antes de enviar</p>
+      <p class="text-[11px] text-ink-faint mt-1">Puedes editar el mensaje antes de enviar</p>
     </div>
 
     <!-- Botones -->
-    <div class="flex justify-end gap-3">
+    <div class="flex justify-end gap-2">
       <button
         @click="dialogVisible = false"
-        class="px-4 py-2 rounded-lg font-bold border border-lavanda-medio text-navy hover:bg-lavanda transition"
+        class="h-9 px-3 rounded-md border hairline text-[12px] font-medium hover:bg-paper-alt transition"
       >
         Cancelar
       </button>
       <button
         @click="enviar"
-        class="px-6 py-2 rounded-lg font-bold bg-wa-green text-white hover:opacity-90 transition shadow-sm flex items-center gap-2"
+        class="h-9 px-4 rounded-md text-[12px] font-medium text-white hover:opacity-90 transition flex items-center gap-2"
+        style="background: var(--emerald-dot);"
       >
-        <i class="pi pi-whatsapp"></i> Abrir WhatsApp
+        <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 1a7 7 0 00-6.06 10.5L1 15l3.6-.94A7 7 0 108 1z"/>
+        </svg>
+        Abrir WhatsApp
       </button>
     </div>
   </Dialog>

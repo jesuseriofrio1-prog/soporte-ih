@@ -6,16 +6,16 @@ defineProps<{
 }>()
 
 const estadoColores: Record<string, string> = {
-  PENDIENTE: 'bg-gray-400',
-  CONFIRMADO: 'bg-blue-500',
-  EN_PREPARACION: 'bg-indigo-500',
-  ENVIADO: 'bg-cyan-500',
-  EN_RUTA: 'bg-yellow-500',
-  NOVEDAD: 'bg-orange-500',
-  RETIRO_EN_AGENCIA: 'bg-purple-500',
-  ENTREGADO: 'bg-green-500',
-  NO_ENTREGADO: 'bg-red-500',
-  DEVUELTO: 'bg-red-800',
+  PENDIENTE:         'dot-stone',
+  CONFIRMADO:        'dot-blue',
+  EN_PREPARACION:    'dot-blue',
+  ENVIADO:           'dot-blue',
+  EN_RUTA:           'dot-blue',
+  NOVEDAD:           'dot-amber',
+  RETIRO_EN_AGENCIA: 'dot-blue',
+  ENTREGADO:         'dot-emerald',
+  NO_ENTREGADO:      'dot-rose',
+  DEVUELTO:          'dot-rose',
 }
 
 const estadoLabels: Record<string, string> = {
@@ -43,44 +43,34 @@ function formatFechaHora(fecha: string): string {
 
 <template>
   <div class="relative">
-    <div v-if="historial.length === 0" class="text-center py-4 text-navy/40 text-sm">
+    <div v-if="historial.length === 0" class="text-center py-4 text-[12px] text-ink-faint">
       Sin historial de estados
     </div>
 
-    <div v-else class="space-y-0">
-      <div
-        v-for="(item, idx) in historial"
+    <ol v-else class="relative border-l hairline ml-2 pl-5 space-y-5">
+      <li
+        v-for="item in historial"
         :key="item.id"
-        class="relative flex gap-3"
+        class="relative"
       >
-        <!-- Línea vertical -->
-        <div class="flex flex-col items-center">
-          <div
-            class="w-3 h-3 rounded-full shrink-0 mt-1.5"
-            :class="estadoColores[item.estado_nuevo] || 'bg-gray-400'"
-          ></div>
-          <div
-            v-if="idx < historial.length - 1"
-            class="w-0.5 flex-1 bg-lavanda-medio min-h-[32px]"
-          ></div>
+        <span
+          class="absolute -left-[27px] top-1 w-3 h-3 rounded-full"
+          :class="estadoColores[item.estado_nuevo] || 'dot-stone'"
+          :style="{ boxShadow: '0 0 0 4px var(--paper-elev)' }"
+        ></span>
+        <div class="text-[11px] text-ink-faint tabular font-mono mb-0.5">
+          {{ formatFechaHora(item.created_at) }}
         </div>
-
-        <!-- Contenido -->
-        <div class="pb-4 flex-1">
-          <p class="text-sm font-bold text-navy">
-            {{ estadoLabels[item.estado_nuevo] || item.estado_nuevo }}
-          </p>
-          <p v-if="item.estado_anterior" class="text-[10px] text-navy/40">
-            desde {{ estadoLabels[item.estado_anterior] || item.estado_anterior }}
-          </p>
-          <p class="text-xs text-navy/50 mt-0.5">
-            {{ formatFechaHora(item.created_at) }}
-          </p>
-          <p v-if="item.nota" class="text-xs text-navy/70 mt-1 bg-lavanda/50 px-2 py-1 rounded">
-            {{ item.nota }}
-          </p>
+        <div class="text-[13px] font-medium">
+          {{ estadoLabels[item.estado_nuevo] || item.estado_nuevo }}
         </div>
-      </div>
-    </div>
+        <div v-if="item.estado_anterior" class="text-[11px] text-ink-faint">
+          desde {{ estadoLabels[item.estado_anterior] || item.estado_anterior }}
+        </div>
+        <div v-if="item.nota" class="text-[12px] text-ink-muted mt-1">
+          {{ item.nota }}
+        </div>
+      </li>
+    </ol>
   </div>
 </template>

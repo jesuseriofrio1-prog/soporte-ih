@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDashboardStore } from '../stores/dashboard'
 import { usePedidosStore } from '../stores/pedidos'
@@ -28,21 +28,11 @@ function formatRelative(iso: string | undefined): string {
   return `${Math.floor(h / 24)}d`
 }
 
-// ────────────── Periodo (Mes / Semana / Hoy) ──────────────
-const periodo = ref<'mes' | 'semana' | 'hoy'>('mes')
-
-const periodoLabel = computed(() => {
-  const mes = new Date().toLocaleDateString('es-EC', { month: 'long', year: 'numeric' })
-  if (periodo.value === 'mes') return mes
-  if (periodo.value === 'semana') return 'Esta semana'
-  return 'Hoy'
-})
-
-const periodoTitulo = computed(() => {
-  if (periodo.value === 'mes') return 'del mes'
-  if (periodo.value === 'semana') return 'de la semana'
-  return 'de hoy'
-})
+// ────────────── Periodo (por ahora solo Mes — el backend sólo expone
+// stats mensuales) ──────────────
+const periodoLabel = computed(() =>
+  new Date().toLocaleDateString('es-EC', { month: 'long', year: 'numeric' }),
+)
 
 // ────────────── KPIs derivados ──────────────
 // El backend solo da stats del mes. Para semana/hoy usamos los agregados
@@ -105,6 +95,8 @@ const productoEstrella = computed(() => {
 // stream. Un futuro backend de activity log reemplazaría esto.
 
 interface ActivityItem {
+  /** Clave estable para v-for: combinación de id + updated_at */
+  key: string
   ts: string
   dotClass: string
   html: string
@@ -129,6 +121,7 @@ const actividad = computed<ActivityItem[]>(() => {
   }
 
   return pedidos.map((p) => ({
+    key: `${p.id}-${p.updated_at}`,
     ts: p.updated_at,
     dotClass: dotByEstado[p.estado] || 'dot-stone',
     html: `Pedido de <span class="font-medium">${escapeHtml(p.cliente_nombre || p.clientes?.nombre || '—')}</span> · <span class="font-medium">${p.estado.toLowerCase().replace(/_/g, ' ')}</span>`,
@@ -171,20 +164,8 @@ function irAPedidosNovedad() {
           {{ periodoLabel }}
         </div>
         <h1 class="h-display text-[40px] leading-none">
-          Panorama <span class="h-display-italic text-ink-muted">{{ periodoTitulo }}</span>
+          Panorama <span class="h-display-italic text-ink-muted">del mes</span>
         </h1>
-      </div>
-      <div class="flex items-center gap-1 p-1 rounded-lg surface">
-        <button
-          v-for="p in (['mes','semana','hoy'] as const)"
-          :key="p"
-          @click="periodo = p"
-          class="px-3 py-1 rounded-md text-[12px] transition"
-          :class="periodo === p ? 'font-medium' : 'text-ink-muted hover:bg-paper-alt'"
-          :style="periodo === p ? { background: 'var(--ink)', color: 'var(--paper)' } : {}"
-        >
-          {{ p === 'mes' ? 'Mes' : p === 'semana' ? 'Semana' : 'Hoy' }}
-        </button>
       </div>
     </div>
 
@@ -372,7 +353,7 @@ function irAPedidosNovedad() {
             <div
               v-for="item in pipelineItems"
               :key="item.key"
-              :class="['group', item.count === 0 ? 'opacity-50' : 'cursor-pointer']"
+              :class="item.count === 0 ? 'opacity-50' : ''"
             >
               <div class="flex items-baseline justify-between mb-1.5">
                 <div class="flex items-center gap-2">
@@ -440,8 +421,8 @@ function irAPedidosNovedad() {
           </div>
           <ol v-else class="space-y-0 divide-y hairline">
             <li
-              v-for="(item, i) in actividad"
-              :key="i"
+              v-for="item in actividad"
+              :key="item.key"
               class="py-3 flex items-start gap-4"
             >
               <span class="text-[11px] tabular font-mono text-ink-faint w-14 pt-0.5">

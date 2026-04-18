@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
 const router = useRouter()
-const route = useRoute()
 const toast = useToast()
 
 const email = ref('')
@@ -22,9 +21,9 @@ async function handleLogin() {
   loading.value = true
   try {
     await authStore.login(email.value, password.value)
-    const redirect = (route.query.redirect as string) || '/dashboard'
-    const safe = redirect.startsWith('/') && !redirect.startsWith('/login') ? redirect : '/dashboard'
-    router.push(safe)
+    // Siempre al Dashboard tras login — el redirect=? se ignora a
+    // propósito: es el "home" natural del panel.
+    router.push('/dashboard')
   } catch (e: unknown) {
     const err = e as { response?: { status?: number }; request?: unknown }
     if (!err.response && !err.request) {
