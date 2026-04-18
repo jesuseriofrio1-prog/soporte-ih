@@ -236,16 +236,12 @@ const estadoBadge: Record<string, string> = {
   DEVUELTO: 'bg-red-200 text-red-800',
 }
 
+// Filtros secundarios (producto + estado). Ahora son CLIENTE-side para que
+// los conteos de los chips reflejen SIEMPRE el total real de la tienda,
+// no el resultado de un fetch filtrado del servidor. Con volumen moderado
+// (<2k pedidos) esto es más rápido y honesto que round-trips al backend.
 const filtroEstado = ref('')
 const filtroProducto = ref('')
-
-function aplicarFiltroEstado() {
-  pedidosStore.setFiltro('estado', filtroEstado.value || undefined)
-}
-
-function aplicarFiltroProducto() {
-  pedidosStore.setFiltro('producto_id', filtroProducto.value || undefined)
-}
 
 // ─────────────────────────────────────────────
 // Chips de antigüedad (cliente-side, sobre la lista ya cargada)
@@ -349,8 +345,13 @@ function getEstadoPrioridad(estado: string): number {
 }
 
 const pedidosOrdenados = computed(() => {
-  // Primero filtramos por el chip de antigüedad activo, luego ordenamos
-  const lista = pedidosStore.pedidos.filter((p) => matchesAntiguedad(p, filtroAntiguedad.value))
+  // Pipeline cliente-side: chip antigüedad + producto + estado, luego orden.
+  const lista = pedidosStore.pedidos.filter((p) => {
+    if (!matchesAntiguedad(p, filtroAntiguedad.value)) return false
+    if (filtroProducto.value && p.producto_id !== filtroProducto.value) return false
+    if (filtroEstado.value && p.estado !== filtroEstado.value) return false
+    return true
+  })
   if (!sortKey.value) return lista
 
   return lista.sort((a, b) => {
@@ -606,7 +607,6 @@ onMounted(() => {
           <i class="pi pi-filter text-mauve text-sm" aria-hidden="true"></i>
           <select
             v-model="filtroProducto"
-            @change="aplicarFiltroProducto"
             class="px-3 py-1.5 text-sm bg-lavanda/40 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-navy font-medium"
           >
             <option value="">Todos los productos</option>
@@ -617,7 +617,6 @@ onMounted(() => {
 
           <select
             v-model="filtroEstado"
-            @change="aplicarFiltroEstado"
             class="px-3 py-1.5 text-sm bg-lavanda/40 border border-lavanda-medio rounded-lg focus:outline-none focus:border-mauve text-navy font-medium"
           >
             <option v-for="e in estadosDisponibles" :key="e.value" :value="e.value">
