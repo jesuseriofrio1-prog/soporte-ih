@@ -9,14 +9,26 @@ export type EstadoSolicitud =
   | 'ENLAZADA'
   | 'CANCELADA';
 
+/**
+ * Datos públicos de una tienda. Deliberadamente NO incluye el UUID
+ * interno (`id`): los clientes finales sólo ven el slug, nombre y
+ * branding. El backend usa el slug para resolver el id internamente.
+ */
 export interface TiendaPublica {
-  id: string;
   slug: string;
   nombre: string;
   logo_url: string | null;
   color_primario: string | null;
   color_secundario: string | null;
   color_fondo: string | null;
+}
+
+/**
+ * Versión con id para uso interno (al crear solicitudes necesitamos el id
+ * de la tienda en BD). Nunca se serializa hacia afuera.
+ */
+interface TiendaPublicaInterna extends TiendaPublica {
+  id: string;
 }
 
 export interface ProductoPublico {
@@ -35,8 +47,8 @@ export class SolicitudesService {
 
   // ─────────────────────── Público ───────────────────────
 
-  /** Devuelve la tienda pública por slug o 404. */
-  async tiendaPublica(slug: string): Promise<TiendaPublica> {
+  /** Versión interna: devuelve la tienda con su UUID (sólo para uso interno). */
+  private async tiendaPublicaInterna(slug: string): Promise<TiendaPublicaInterna> {
     const { data, error } = await this.supabase
       .getClient()
       .from('tiendas')
@@ -46,10 +58,20 @@ export class SolicitudesService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException(`Tienda "${slug}" no existe o está inactiva`);
-    return data as TiendaPublica;
+    return data as TiendaPublicaInterna;
   }
 
-  /** Catálogo público: sólo productos activos con stock>0, campos mínimos. */
+  /**
+   * Devuelve la tienda pública (sin UUID) por slug o 404.
+   * El UUID se oculta para minimizar la superficie que ven clientes finales.
+   */
+  async tiendaPublica(slug: string): Promise<TiendaPublica> {
+    const { id: _id, ...publica } = await this.tiendaPublicaInterna(slug);
+    void _id;
+    return publica;
+  }
+
+  /** Catálogo público: sólo productos activos, campos mínimos. */
   async catalogoPublico(tiendaId: string): Promise<ProductoPublico[]> {
     const { data, error } = await this.supabase
       .getClient()
@@ -60,6 +82,30 @@ export class SolicitudesService {
       .order('nombre', { ascending: true });
     if (error) throw error;
     return (data ?? []) as ProductoPublico[];
+  }
+
+  /**
+   * Wrapper one-shot: dada una tienda por slug, devuelve su info pública
+   * (sin UUID) y su catálogo. Útil para el endpoint GET /public/tiendas/:slug.
+   */
+  async tiendaConCatalogo(
+    slug: string,
+  ): Promise<{ tienda: TiendaPublica; catalogo: ProductoPublico[] }> {
+    const interna = await this.tiendaPublicaInterna(slug);
+    const { id, ...publica } = interna;
+    const catalogo = await this.catalogoPublico(id);
+    return { tienda: publica, catalogo };
+  }
+
+  /** Wrapper: tienda + producto específico por slugs, sin exponer el UUID. */
+  async tiendaConProducto(
+    slug: string,
+    productoSlug: string,
+  ): Promise<{ tienda: TiendaPublica; producto: ProductoPublico }> {
+    const interna = await this.tiendaPublicaInterna(slug);
+    const { id, ...publica } = interna;
+    const producto = await this.productoPublico(id, productoSlug);
+    return { tienda: publica, producto };
   }
 
   /** Devuelve un producto público por slug o 404 (validando que sea de esa tienda). */
@@ -85,7 +131,8 @@ export class SolicitudesService {
     ip: string | null;
     userAgent: string | null;
   }) {
-    const tienda = await this.tiendaPublica(params.tiendaSlug);
+    // Versión interna porque necesitamos el id de la tienda para el insert.
+    const tienda = await this.tiendaPublicaInterna(params.tiendaSlug);
 
     // Resolver producto: por slug (del path) o por body.producto_id (catálogo-general).
     let productoId: string | null = null;

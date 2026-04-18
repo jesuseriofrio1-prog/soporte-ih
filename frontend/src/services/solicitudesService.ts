@@ -14,8 +14,11 @@ export interface ProductoPublico {
   icono: string | null
 }
 
+/**
+ * Tienda pública: deliberadamente sin UUID interno. El frontend público
+ * no lo necesita (todo se resuelve por slug en el backend).
+ */
 export interface TiendaPublica {
-  id: string
   slug: string
   nombre: string
   logo_url: string | null

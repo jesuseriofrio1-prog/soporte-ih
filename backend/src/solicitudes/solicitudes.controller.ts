@@ -38,27 +38,23 @@ export class SolicitudesController {
 
   // ─────────────────── Público ───────────────────
 
-  /** GET /api/public/tiendas/:slug → tienda pública + catálogo */
+  /** GET /api/public/tiendas/:slug → tienda pública (sin UUID) + catálogo */
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 60 } })
   @Get('public/tiendas/:slug')
-  async tiendaPublica(@Param('slug') slug: string) {
-    const tienda = await this.service.tiendaPublica(slug);
-    const catalogo = await this.service.catalogoPublico(tienda.id);
-    return { tienda, catalogo };
+  tiendaPublica(@Param('slug') slug: string) {
+    return this.service.tiendaConCatalogo(slug);
   }
 
   /** GET /api/public/tiendas/:slug/productos/:productoSlug → tienda + producto */
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 60 } })
   @Get('public/tiendas/:slug/productos/:productoSlug')
-  async productoPublico(
+  productoPublico(
     @Param('slug') slug: string,
     @Param('productoSlug') productoSlug: string,
   ) {
-    const tienda = await this.service.tiendaPublica(slug);
-    const producto = await this.service.productoPublico(tienda.id, productoSlug);
-    return { tienda, producto };
+    return this.service.tiendaConProducto(slug, productoSlug);
   }
 
   /** POST /api/public/tiendas/:slug/solicitudes[?producto=<slug>] → crea */

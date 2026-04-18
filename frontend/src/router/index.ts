@@ -77,28 +77,32 @@ const router = createRouter({
 })
 
 /**
- * Guard de auth. Las rutas `meta.public === true` no requieren login. Para el
- * resto, validamos la cookie de sesión con GET /auth/me en el primer hit y
- * cacheamos el resultado en `authStore.checked`. Si /auth/me falla, redirect
- * a /login con ?redirect= para volver después.
+ * Guard de auth.
+ *
+ * Reglas:
+ *  - Formularios públicos (/p/:slug/*) no llaman a /auth/me. Los navegadores
+ *    de clientes finales nunca deben tocar endpoints de sesión — reduce ruido
+ *    de 401s y superficie de contacto con el backend admin.
+ *  - /login sí llama a /auth/me: si ya hay sesión, redirige a /dashboard.
+ *  - Rutas privadas: si no hay sesión, a /login con ?redirect=.
  */
 router.beforeEach(async (to) => {
-  // Lazy import para evitar ciclos pinia ↔ router.
+  const isPublicForm = to.name === 'public-solicitud'
+  if (isPublicForm) return // no tocamos auth
+
   const { useAuthStore } = await import('../stores/auth')
   const auth = useAuthStore()
 
-  const isPublic = to.matched.some((r) => r.meta?.public)
-
-  // Validamos sesión una vez por carga (cubre refresh de página).
   if (!auth.checked) {
     await auth.checkToken()
   }
 
-  if (!isPublic && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+  if (to.name === 'login') {
+    return auth.isAuthenticated ? { path: '/dashboard' } : undefined
   }
-  if (to.name === 'login' && auth.isAuthenticated) {
-    return { path: '/dashboard' }
+
+  if (!auth.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
 })
 
