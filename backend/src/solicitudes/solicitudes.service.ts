@@ -37,6 +37,7 @@ export interface ProductoPublico {
   nombre: string;
   precio: number | null;
   icono: string | null;
+  foto_url: string | null;
   /** Si está presente, este producto es un bundle upgrade del producto_id listado. */
   bundle_upgrade_desde?: string | null;
   es_bundle?: boolean;
@@ -79,7 +80,7 @@ export class SolicitudesService {
     const { data, error } = await this.supabase
       .getClient()
       .from('productos')
-      .select('id, slug, nombre, precio, icono, es_bundle, bundle_upgrade_desde')
+      .select('id, slug, nombre, precio, icono, foto_url, es_bundle, bundle_upgrade_desde')
       .eq('tienda_id', tiendaId)
       .eq('activo', true)
       .order('nombre', { ascending: true });
@@ -116,7 +117,7 @@ export class SolicitudesService {
     const { data, error } = await this.supabase
       .getClient()
       .from('productos')
-      .select('id, slug, nombre, precio, icono, es_bundle, bundle_upgrade_desde')
+      .select('id, slug, nombre, precio, icono, foto_url, es_bundle, bundle_upgrade_desde')
       .eq('tienda_id', tiendaId)
       .eq('slug', productoSlug)
       .eq('activo', true)

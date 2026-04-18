@@ -208,10 +208,19 @@ function riesgoDe(p: Pedido) {
           <td class="py-3 px-2">
             <div class="flex items-center gap-2">
               <div
-                class="w-6 h-6 rounded grid place-items-center text-[9px] font-semibold shrink-0"
-                style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft)); color: var(--rose-fg);"
+                class="w-6 h-6 rounded overflow-hidden shrink-0 grid place-items-center text-[9px] font-semibold"
+                :style="pedido.productos?.foto_url
+                  ? { background: 'var(--paper-alt)' }
+                  : { background: 'linear-gradient(135deg, var(--rose-bg), var(--accent-soft))', color: 'var(--rose-fg)' }"
               >
-                {{ inicialesProducto(pedido.productos?.nombre) }}
+                <img
+                  v-if="pedido.productos?.foto_url"
+                  :src="pedido.productos.foto_url"
+                  :alt="pedido.productos.nombre"
+                  loading="lazy"
+                  class="w-full h-full object-cover"
+                />
+                <span v-else>{{ inicialesProducto(pedido.productos?.nombre) }}</span>
               </div>
               <div class="min-w-0">
                 <div class="truncate">{{ pedido.productos?.nombre || '—' }}</div>

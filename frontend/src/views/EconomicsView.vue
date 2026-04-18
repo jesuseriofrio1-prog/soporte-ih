@@ -275,10 +275,19 @@ watch(() => tiendaStore.tiendaActivaId, () => {
             <td class="py-3 pl-5 pr-2">
               <div class="flex items-center gap-2">
                 <div
-                  class="w-8 h-8 rounded grid place-items-center text-[10px] font-semibold shrink-0"
-                  style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft)); color: var(--rose-fg);"
+                  class="w-8 h-8 rounded overflow-hidden shrink-0 grid place-items-center text-[10px] font-semibold"
+                  :style="f.producto.foto_url
+                    ? { background: 'var(--paper-alt)' }
+                    : { background: 'linear-gradient(135deg, var(--rose-bg), var(--accent-soft))', color: 'var(--rose-fg)' }"
                 >
-                  {{ f.producto.nombre.charAt(0).toUpperCase() }}
+                  <img
+                    v-if="f.producto.foto_url"
+                    :src="f.producto.foto_url"
+                    :alt="f.producto.nombre"
+                    loading="lazy"
+                    class="w-full h-full object-cover"
+                  />
+                  <span v-else>{{ f.producto.nombre.charAt(0).toUpperCase() }}</span>
                 </div>
                 <div class="min-w-0">
                   <div class="font-medium truncate">{{ f.producto.nombre }}</div>

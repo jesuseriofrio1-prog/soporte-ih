@@ -12,6 +12,7 @@ export interface ProductoPublico {
   nombre: string
   precio: number | null
   icono: string | null
+  foto_url: string | null
   /** Si es true, este producto aparece como upgrade del bundle_upgrade_desde. */
   es_bundle?: boolean
   bundle_upgrade_desde?: string | null

@@ -50,5 +50,22 @@ export const useProductosStore = defineStore('productos', () => {
     return eliminado
   }
 
-  return { productos, loading, error, fetchProductos, crearProducto, editarProducto, eliminarProducto }
+  async function subirFoto(id: string, file: File) {
+    const { foto_url } = await productosService.subirFoto(id, file)
+    const idx = productos.value.findIndex((p) => p.id === id)
+    if (idx !== -1) productos.value[idx] = { ...productos.value[idx], foto_url }
+    return foto_url
+  }
+
+  async function borrarFoto(id: string) {
+    await productosService.borrarFoto(id)
+    const idx = productos.value.findIndex((p) => p.id === id)
+    if (idx !== -1) productos.value[idx] = { ...productos.value[idx], foto_url: null }
+  }
+
+  return {
+    productos, loading, error,
+    fetchProductos, crearProducto, editarProducto, eliminarProducto,
+    subirFoto, borrarFoto,
+  }
 })

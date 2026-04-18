@@ -53,6 +53,13 @@ const form = ref({
 
 const formErrors = ref<Record<string, string>>({})
 
+// Foto del producto: archivo pendiente de subir + preview local.
+const fotoPendiente = ref<File | null>(null)
+const fotoPreview = ref<string | null>(null)
+const fotoActual = ref<string | null>(null)
+const uploadingFoto = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+
 // Productos disponibles como base para un bundle (excluye el que se edita
 // y los que ya son bundle — no queremos bundle-of-bundle).
 const productosBase = computed(() =>
@@ -60,6 +67,49 @@ const productosBase = computed(() =>
     !p.es_bundle && p.activo && p.id !== productoEditId.value,
   ),
 )
+
+function resetFoto() {
+  fotoPendiente.value = null
+  fotoPreview.value = null
+  fotoActual.value = null
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+function onFotoChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) {
+    toast.warning('La imagen supera 5 MB')
+    target.value = ''
+    return
+  }
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+    toast.warning('Formato no permitido. Usa JPG, PNG, WebP o GIF.')
+    target.value = ''
+    return
+  }
+  fotoPendiente.value = file
+  const reader = new FileReader()
+  reader.onload = (e) => { fotoPreview.value = (e.target?.result as string) ?? null }
+  reader.readAsDataURL(file)
+}
+
+async function quitarFotoActual() {
+  if (!productoEditId.value || !fotoActual.value) {
+    // producto nuevo o sin foto remota → sólo limpia el preview
+    resetFoto()
+    return
+  }
+  if (!confirm('¿Quitar la foto actual?')) return
+  try {
+    await store.borrarFoto(productoEditId.value)
+    resetFoto()
+    toast.success('Foto eliminada')
+  } catch {
+    toast.error('No se pudo eliminar la foto')
+  }
+}
 
 function abrirModalCrear() {
   editando.value = false
@@ -70,6 +120,7 @@ function abrirModalCrear() {
     es_bundle: false, bundle_upgrade_desde: '',
   }
   formErrors.value = {}
+  resetFoto()
   modalVisible.value = true
 }
 
@@ -88,6 +139,10 @@ function abrirModalEditar(producto: Producto) {
     bundle_upgrade_desde: producto.bundle_upgrade_desde ?? '',
   }
   formErrors.value = {}
+  fotoPendiente.value = null
+  fotoPreview.value = null
+  fotoActual.value = producto.foto_url
+  if (fileInput.value) fileInput.value.value = ''
   modalVisible.value = true
 }
 
@@ -127,6 +182,7 @@ async function guardar() {
     : null
 
   try {
+    let productoId: string
     if (editando.value && productoEditId.value) {
       await store.editarProducto(productoEditId.value, {
         nombre: form.value.nombre,
@@ -138,9 +194,9 @@ async function guardar() {
         es_bundle: form.value.es_bundle,
         bundle_upgrade_desde: upgradePayload,
       })
-      toast.success('Producto actualizado')
+      productoId = productoEditId.value
     } else {
-      await store.crearProducto({
+      const creado = await store.crearProducto({
         nombre: form.value.nombre,
         slug: form.value.slug,
         precio: form.value.precio,
@@ -151,8 +207,22 @@ async function guardar() {
         es_bundle: form.value.es_bundle,
         bundle_upgrade_desde: form.value.es_bundle ? (form.value.bundle_upgrade_desde || undefined) : undefined,
       })
-      toast.success('Producto creado')
+      productoId = creado.id
     }
+
+    // Subir foto si hay una pendiente (sólo tras persistir el producto).
+    if (fotoPendiente.value) {
+      uploadingFoto.value = true
+      try {
+        await store.subirFoto(productoId, fotoPendiente.value)
+      } catch {
+        toast.warning('Producto guardado, pero falló la subida de la foto')
+      } finally {
+        uploadingFoto.value = false
+      }
+    }
+
+    toast.success(editando.value ? 'Producto actualizado' : 'Producto creado')
     modalVisible.value = false
   } catch (e: any) {
     const msg = e.response?.data?.message || 'Error al guardar'
@@ -230,12 +300,21 @@ onMounted(() => {
         class="surface rounded-xl overflow-hidden group hover:shadow-md transition cursor-pointer"
         @click="abrirModalEditar(producto)"
       >
-        <!-- Imagen placeholder con gradiente rose -->
+        <!-- Foto real o placeholder con gradiente rose -->
         <div
           class="aspect-[4/3] relative overflow-hidden"
-          style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft));"
+          :style="producto.foto_url
+            ? { background: 'var(--paper-alt)' }
+            : { background: 'linear-gradient(135deg, var(--rose-bg), var(--accent-soft))' }"
         >
-          <div class="absolute inset-0 grid place-items-center opacity-50">
+          <img
+            v-if="producto.foto_url"
+            :src="producto.foto_url"
+            :alt="producto.nombre"
+            loading="lazy"
+            class="absolute inset-0 w-full h-full object-cover"
+          />
+          <div v-else class="absolute inset-0 grid place-items-center opacity-50">
             <i
               v-if="producto.icono"
               :class="producto.icono"
@@ -332,6 +411,59 @@ onMounted(() => {
       }"
     >
       <form @submit.prevent="guardar" class="space-y-4">
+        <!-- Foto del producto -->
+        <div>
+          <label class="block text-sm font-bold text-navy mb-2">Foto del producto</label>
+          <div class="flex items-start gap-3">
+            <!-- Preview / placeholder -->
+            <div
+              class="w-24 h-24 rounded-lg overflow-hidden shrink-0 grid place-items-center"
+              style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft)); border: 1px solid var(--line);"
+            >
+              <img
+                v-if="fotoPreview || fotoActual"
+                :src="fotoPreview || fotoActual || ''"
+                :alt="form.nombre"
+                class="w-full h-full object-cover"
+              />
+              <svg v-else class="w-10 h-10" style="color: var(--accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                <circle cx="9" cy="10" r="2"/>
+                <path d="M3 17l5-5 4 4 3-3 6 6" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                @change="onFotoChange"
+                class="hidden"
+              />
+              <button
+                type="button"
+                @click="fileInput?.click()"
+                :disabled="uploadingFoto"
+                class="h-8 px-3 rounded-md border hairline text-[12px] font-medium hover:bg-paper-alt transition disabled:opacity-50"
+              >
+                {{ fotoPreview || fotoActual ? 'Cambiar foto' : 'Subir foto' }}
+              </button>
+              <button
+                v-if="fotoPreview || fotoActual"
+                type="button"
+                @click="quitarFotoActual"
+                class="ml-1 h-8 px-3 rounded-md border hairline text-[12px] font-medium hover:bg-paper-alt transition"
+                :style="{ color: 'var(--rose-dot)' }"
+              >
+                Quitar
+              </button>
+              <p class="text-[11px] text-ink-faint mt-2">
+                JPG, PNG, WebP o GIF · máx 5 MB. Se muestra en el catálogo, en el formulario público y en el tracking.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <!-- Nombre -->
         <div>
           <label class="block text-sm font-bold text-navy mb-1">Nombre</label>

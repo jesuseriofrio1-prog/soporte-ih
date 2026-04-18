@@ -357,9 +357,19 @@ const riesgoAccionable = computed(() =>
         <!-- Producto card -->
         <div v-if="!editando" class="surface rounded-lg p-4 mb-6 flex items-center gap-4">
           <div
-            class="w-12 h-12 rounded shrink-0"
-            style="background: linear-gradient(135deg, var(--rose-bg), var(--accent-soft));"
-          ></div>
+            class="w-12 h-12 rounded overflow-hidden shrink-0"
+            :style="pedido.productos?.foto_url
+              ? { background: 'var(--paper-alt)' }
+              : { background: 'linear-gradient(135deg, var(--rose-bg), var(--accent-soft))' }"
+          >
+            <img
+              v-if="pedido.productos?.foto_url"
+              :src="pedido.productos.foto_url"
+              :alt="pedido.productos.nombre"
+              loading="lazy"
+              class="w-full h-full object-cover"
+            />
+          </div>
           <div class="flex-1 min-w-0">
             <div class="font-medium truncate">{{ pedido.productos?.nombre || '—' }}</div>
             <div class="text-[11px] text-ink-faint tabular font-mono">

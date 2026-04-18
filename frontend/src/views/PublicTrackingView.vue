@@ -20,7 +20,7 @@ interface TrackingData {
   provincia: string | null
   dias_en_agencia: number
   cliente_nombre_masked: string
-  producto: { nombre: string; slug: string; icono: string | null } | null
+  producto: { nombre: string; slug: string; icono: string | null; foto_url: string | null } | null
   tienda: {
     slug: string
     nombre: string
@@ -179,10 +179,21 @@ onMounted(async () => {
         <div class="p-6 border-b hairline">
           <div class="flex items-start gap-4 flex-wrap">
             <div
-              class="w-14 h-14 rounded-xl grid place-items-center text-2xl shrink-0"
-              :style="{ background: `linear-gradient(135deg, var(--accent-soft), var(--paper-alt))` }"
+              class="w-16 h-16 rounded-xl overflow-hidden shrink-0"
+              :style="data.producto?.foto_url
+                ? { background: 'var(--paper-alt)' }
+                : { background: 'linear-gradient(135deg, var(--accent-soft), var(--paper-alt))' }"
             >
-              {{ data.producto?.icono || '📦' }}
+              <img
+                v-if="data.producto?.foto_url"
+                :src="data.producto.foto_url"
+                :alt="data.producto.nombre"
+                loading="lazy"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="w-full h-full grid place-items-center text-2xl">
+                {{ data.producto?.icono || '📦' }}
+              </div>
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-[10px] uppercase tracking-wider text-ink-faint font-semibold">

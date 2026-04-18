@@ -235,11 +235,23 @@ function aceptarBundle() {
           class="p-5 border-b flex items-center gap-4"
           :style="{ backgroundColor: 'var(--brand-fondo)' }"
         >
+          <!-- Foto real si existe, sino placeholder con emoji/icono -->
           <div
-            class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl shrink-0"
-            :style="{ backgroundColor: 'var(--brand-secondary)' }"
+            class="w-16 h-16 rounded-xl overflow-hidden shrink-0"
+            :style="productoActivo.foto_url
+              ? { background: 'var(--paper-alt)' }
+              : { backgroundColor: 'var(--brand-secondary)' }"
           >
-            {{ productoActivo.icono || '📦' }}
+            <img
+              v-if="productoActivo.foto_url"
+              :src="productoActivo.foto_url"
+              :alt="productoActivo.nombre"
+              loading="lazy"
+              class="w-full h-full object-cover"
+            />
+            <div v-else class="w-full h-full flex items-center justify-center text-2xl">
+              {{ productoActivo.icono || '📦' }}
+            </div>
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs uppercase tracking-wider text-gray-500">Producto</p>
@@ -261,10 +273,21 @@ function aceptarBundle() {
           </div>
           <div class="flex items-start gap-3">
             <div
-              class="w-12 h-12 rounded-lg flex items-center justify-center text-xl shrink-0"
-              :style="{ backgroundColor: 'var(--brand-secondary)' }"
+              class="w-12 h-12 rounded-lg overflow-hidden shrink-0"
+              :style="bundleSugerido.foto_url
+                ? { background: 'var(--paper-alt)' }
+                : { backgroundColor: 'var(--brand-secondary)' }"
             >
-              {{ bundleSugerido.icono || '🎁' }}
+              <img
+                v-if="bundleSugerido.foto_url"
+                :src="bundleSugerido.foto_url"
+                :alt="bundleSugerido.nombre"
+                loading="lazy"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center text-xl">
+                {{ bundleSugerido.icono || '🎁' }}
+              </div>
             </div>
             <div class="flex-1 min-w-0">
               <p class="font-bold text-gray-800 text-sm">{{ bundleSugerido.nombre }}</p>

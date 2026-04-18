@@ -20,6 +20,7 @@ export interface TrackingPublico {
     nombre: string;
     slug: string;
     icono: string | null;
+    foto_url: string | null;
   } | null;
   tienda: {
     slug: string;
@@ -67,7 +68,7 @@ export class TrackingPublicoService {
         provincia,
         dias_en_agencia,
         cliente_nombre,
-        productos(nombre, slug, icono),
+        productos(nombre, slug, icono, foto_url),
         tiendas(slug, nombre, logo_url, color_primario, color_secundario, color_fondo),
         historial_estados(estado_nuevo, nota, created_at)
       `)
@@ -96,6 +97,7 @@ export class TrackingPublicoService {
             nombre: producto.nombre as string,
             slug: producto.slug as string,
             icono: (producto.icono as string) ?? null,
+            foto_url: (producto.foto_url as string) ?? null,
           }
         : null,
       tienda: {

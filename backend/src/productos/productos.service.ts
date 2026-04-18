@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ConflictException,
@@ -6,6 +7,21 @@ import {
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateProductoDto } from './dto/create-producto.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
+
+const FOTOS_BUCKET = 'producto-fotos';
+const MIME_ALLOWED = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+const EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 @Injectable()
 export class ProductosService {
@@ -88,6 +104,87 @@ export class ProductosService {
 
     if (error) throw error;
     return data;
+  }
+
+  /**
+   * Sube una foto del producto al bucket `producto-fotos` y guarda la
+   * URL pública en la columna. Reemplaza cualquier foto previa (borra
+   * el archivo viejo si existía).
+   */
+  async subirFoto(
+    productoId: string,
+    file: { buffer: Buffer; mimetype: string; size: number },
+  ): Promise<{ foto_url: string }> {
+    if (!file?.buffer) {
+      throw new BadRequestException('Archivo no provisto');
+    }
+    if (!MIME_ALLOWED.has(file.mimetype)) {
+      throw new BadRequestException(
+        `Formato no permitido (${file.mimetype}). Sólo JPG, PNG, WebP o GIF.`,
+      );
+    }
+    if (file.size > MAX_SIZE) {
+      throw new BadRequestException('La imagen supera 5 MB');
+    }
+
+    const producto = await this.findOne(productoId);
+    const ext = EXT_BY_MIME[file.mimetype];
+    // Path estable por producto: cache-buster con timestamp en query.
+    const path = `${producto.tienda_id}/${productoId}.${ext}`;
+
+    const storage = this.supabase.getClient().storage.from(FOTOS_BUCKET);
+
+    // Borra fotos previas de otras extensiones (jpg vs png).
+    if (producto.foto_url) {
+      const oldPaths = Object.values(EXT_BY_MIME)
+        .map((e) => `${producto.tienda_id}/${productoId}.${e}`)
+        .filter((p) => p !== path);
+      await storage.remove(oldPaths).catch(() => {
+        /* silencioso — si no existía no pasa nada */
+      });
+    }
+
+    const { error: upErr } = await storage.upload(path, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
+      cacheControl: '3600',
+    });
+    if (upErr) throw new BadRequestException(`Error subiendo: ${upErr.message}`);
+
+    const { data: pub } = storage.getPublicUrl(path);
+    // Cache-buster para forzar refresh en navegadores tras reemplazar.
+    const foto_url = `${pub.publicUrl}?v=${Date.now()}`;
+
+    const { error } = await this.supabase
+      .getClient()
+      .from('productos')
+      .update({ foto_url })
+      .eq('id', productoId);
+    if (error) throw error;
+
+    return { foto_url };
+  }
+
+  /** Borra la foto del producto (storage + DB). */
+  async borrarFoto(productoId: string): Promise<{ ok: true }> {
+    const producto = await this.findOne(productoId);
+    if (!producto.foto_url) return { ok: true };
+
+    const storage = this.supabase.getClient().storage.from(FOTOS_BUCKET);
+    const paths = Object.values(EXT_BY_MIME).map(
+      (e) => `${producto.tienda_id}/${productoId}.${e}`,
+    );
+    await storage.remove(paths).catch(() => {
+      /* silencioso */
+    });
+
+    const { error } = await this.supabase
+      .getClient()
+      .from('productos')
+      .update({ foto_url: null })
+      .eq('id', productoId);
+    if (error) throw error;
+    return { ok: true };
   }
 
   /** Soft delete: poner activo=false */

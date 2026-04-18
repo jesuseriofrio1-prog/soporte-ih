@@ -16,6 +16,8 @@ export interface Producto {
   es_bundle: boolean
   /** UUID del producto "base" que dispara el bundle (null si no es bundle). */
   bundle_upgrade_desde: string | null
+  /** URL pública de la foto del producto (null = usa placeholder). */
+  foto_url: string | null
   created_at: string
   updated_at: string
 }
@@ -71,6 +73,19 @@ const productosService = {
   async remove(id: string): Promise<Producto> {
     const { data } = await api.delete(`/productos/${id}`)
     return data
+  },
+
+  async subirFoto(id: string, file: File): Promise<{ foto_url: string }> {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post(`/productos/${id}/foto`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  async borrarFoto(id: string): Promise<void> {
+    await api.delete(`/productos/${id}/foto`)
   },
 }
 

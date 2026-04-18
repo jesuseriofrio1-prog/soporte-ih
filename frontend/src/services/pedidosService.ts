@@ -11,6 +11,7 @@ export interface PedidoProducto {
   nombre: string
   slug: string
   precio?: number
+  foto_url?: string | null
 }
 
 export interface Pedido {

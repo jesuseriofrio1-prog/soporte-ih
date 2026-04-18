@@ -36,7 +36,7 @@ export class PedidosService {
     let query = this.supabase
       .getClient()
       .from('pedidos')
-      .select('*, clientes(nombre, telefono), productos(nombre, slug)');
+      .select('*, clientes(nombre, telefono), productos(nombre, slug, foto_url)');
 
     if (filtros.tienda_id) {
       query = query.eq('tienda_id', filtros.tienda_id);
@@ -76,7 +76,7 @@ export class PedidosService {
     const { data: pedido, error } = await this.supabase
       .getClient()
       .from('pedidos')
-      .select('*, clientes(nombre, telefono, ciudad), productos(nombre, slug, precio)')
+      .select('*, clientes(nombre, telefono, ciudad), productos(nombre, slug, precio, foto_url)')
       .eq('id', id)
       .single();
 
@@ -185,7 +185,7 @@ export class PedidosService {
         estado: 'PENDIENTE',
         tienda_id: dto.tienda_id,
       })
-      .select('*, clientes(nombre, telefono), productos(nombre, slug)')
+      .select('*, clientes(nombre, telefono), productos(nombre, slug, foto_url)')
       .single();
 
     if (errPedido) throw errPedido;
