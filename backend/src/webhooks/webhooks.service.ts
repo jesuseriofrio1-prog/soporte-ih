@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { mapEstadoRocket } from '../imports/rocket-estado.map';
+import { SolicitudesService } from '../solicitudes/solicitudes.service';
 
 /**
  * Payload típico del webhook de Rocket Ecuador para cambios de estado.
@@ -35,7 +36,10 @@ export interface WebhookProcessResult {
 export class WebhooksService {
   private readonly log = new Logger(WebhooksService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly solicitudes: SolicitudesService,
+  ) {}
 
   /**
    * Procesa un webhook de Rocket. No lanza — registra el resultado en
@@ -111,7 +115,7 @@ export class WebhooksService {
 
     const { data: pedido, error } = await db
       .from('pedidos')
-      .select('id, estado, retencion_inicio')
+      .select('id, tienda_id, estado, retencion_inicio')
       .eq('external_source', 'rocket')
       .eq('external_order_id', externalOrderId)
       .maybeSingle();
@@ -149,6 +153,14 @@ export class WebhooksService {
     if (TERMINAL.has(nuevoEstado) && pedido.retencion_inicio) {
       patch.retencion_inicio = null;
     }
+
+    // Enlace oportunista: si existe solicitud esperando este rocket_order_id
+    // la vinculamos al pedido, incluso si no hubo cambios de estado esta vez.
+    await this.solicitudes.enlazarDesdePedido(
+      pedido.tienda_id as string,
+      externalOrderId,
+      pedido.id,
+    );
 
     if (Object.keys(patch).length === 0) {
       return {

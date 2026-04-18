@@ -5,6 +5,13 @@ const routes = [
     path: '/',
     redirect: '/dashboard',
   },
+  // Formulario público sin layout: link compartible con clientes finales
+  {
+    path: '/p/:tiendaSlug/:productoSlug?',
+    name: 'public-solicitud',
+    component: () => import('../views/PublicSolicitudView.vue'),
+    meta: { public: true },
+  },
   {
     path: '/',
     component: () => import('../components/layout/AppLayout.vue'),
@@ -49,6 +56,12 @@ const routes = [
         name: 'integraciones',
         component: () => import('../views/IntegracionesView.vue'),
         meta: { title: 'Integraciones' },
+      },
+      {
+        path: 'solicitudes',
+        name: 'solicitudes',
+        component: () => import('../views/SolicitudesView.vue'),
+        meta: { title: 'Solicitudes públicas' },
       },
     ],
   },

@@ -13,6 +13,7 @@ import { TiendasModule } from './tiendas/tiendas.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { ImportsModule } from './imports/imports.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { SolicitudesModule } from './solicitudes/solicitudes.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     TrackingModule,
     ImportsModule,
     WebhooksModule,
+    SolicitudesModule,
   ],
   controllers: [AppController],
   providers: [],

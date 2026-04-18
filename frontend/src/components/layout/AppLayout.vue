@@ -8,6 +8,7 @@ import { useDashboardStore } from '../../stores/dashboard'
 import { useProductosStore } from '../../stores/productos'
 import { usePedidosStore } from '../../stores/pedidos'
 import { useClientesStore } from '../../stores/clientes'
+import solicitudesService from '../../services/solicitudesService'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +20,19 @@ const clientesStore = useClientesStore()
 
 // Almacenamiento
 const storage = ref<StorageInfo | null>(null)
+
+// Solicitudes abiertas (pendientes + en Rocket) para el badge del sidebar
+const solicitudesAbiertas = ref(0)
+
+async function cargarSolicitudesStats() {
+  if (!tiendaStore.tiendaActivaId) return
+  try {
+    const s = await solicitudesService.stats(tiendaStore.tiendaActivaId)
+    solicitudesAbiertas.value = s.total_abiertas
+  } catch {
+    // silencioso
+  }
+}
 
 async function loadStorage() {
   try {
@@ -33,6 +47,7 @@ function recargarDatosTienda() {
   productosStore.fetchProductos(true)
   pedidosStore.fetchPedidos()
   clientesStore.fetchClientes()
+  cargarSolicitudesStats()
   aplicarColoresTienda()
 }
 
@@ -80,6 +95,12 @@ const navItems = computed(() => [
   },
   { name: 'Catálogo', route: '/catalogo', icon: 'pi pi-box', badge: 0 },
   { name: 'Clientes', route: '/clientes', icon: 'pi pi-users', badge: 0 },
+  {
+    name: 'Solicitudes',
+    route: '/solicitudes',
+    icon: 'pi pi-inbox',
+    badge: solicitudesAbiertas.value,
+  },
 ])
 
 const sidebarOpen = ref(false)

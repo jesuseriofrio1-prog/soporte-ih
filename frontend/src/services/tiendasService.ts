@@ -2,6 +2,7 @@ import api from './api'
 
 export interface Tienda {
   id: string
+  slug: string
   nombre: string
   estado: boolean
   logo_url: string | null

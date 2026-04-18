@@ -3,6 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { normalizarTelefono } from '../common/utils';
 import { parseRocketExcel, type ParsedRow } from './rocket-excel.parser';
 import { ProductoMatcherAI } from './producto-matcher';
+import { SolicitudesService } from '../solicitudes/solicitudes.service';
 
 /** Umbral mínimo para crear alias automáticamente tras match por IA. */
 const AUTO_MATCH_CONFIDENCE = 85;
@@ -49,6 +50,7 @@ export class ImportsService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly matcherAI: ProductoMatcherAI,
+    private readonly solicitudes: SolicitudesService,
   ) {}
 
   /**
@@ -211,13 +213,19 @@ export class ImportsService {
 
       try {
         const existeId = existingByExtId.get(row.externalOrderId);
+        let pedidoId: string;
         if (existeId) {
           await this.actualizarPedidoExistente(existeId, row);
           result.actualizados++;
+          pedidoId = existeId;
         } else {
-          await this.crearPedidoDesdeRow(tiendaId, productoId, row);
+          pedidoId = await this.crearPedidoDesdeRow(tiendaId, productoId, row);
           result.creados++;
         }
+
+        // Enlace oportunista: si hay solicitud esperando este external_order_id
+        // la dejamos ENLAZADA. No bloquea la import si falla.
+        await this.solicitudes.enlazarDesdePedido(tiendaId, row.externalOrderId, pedidoId);
       } catch (e) {
         this.log.error(`Error procesando fila ${row.rowNumber} (ID ${row.externalOrderId})`, e);
         result.erroresValidacion.push({
@@ -265,7 +273,7 @@ export class ImportsService {
    * correspondiente en la misma tienda, haciendo match por teléfono
    * normalizado.
    */
-  private async crearPedidoDesdeRow(tiendaId: string, productoId: string, row: ParsedRow) {
+  private async crearPedidoDesdeRow(tiendaId: string, productoId: string, row: ParsedRow): Promise<string> {
     const db = this.supabase.getClient();
     const telefonoNorm = normalizarTelefono(row.telefono);
 
@@ -344,6 +352,8 @@ export class ImportsService {
       estado_nuevo: row.estadoMapped,
       nota: `Importado desde Rocket (ID ${row.externalOrderId})`,
     });
+
+    return pedido.id as string;
   }
 
   /**

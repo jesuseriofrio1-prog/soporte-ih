@@ -4,10 +4,32 @@ import { useToast } from 'vue-toastification'
 import Swal from 'sweetalert2'
 import Dialog from 'primevue/dialog'
 import { useProductosStore } from '../stores/productos'
+import { useTiendaStore } from '../stores/tienda'
 import type { Producto } from '../services/productosService'
 
 const toast = useToast()
 const store = useProductosStore()
+const tiendaStore = useTiendaStore()
+
+function linkPublico(producto: Producto): string {
+  const slug = tiendaStore.tiendaActiva?.slug
+  if (!slug) return ''
+  return `${window.location.origin}/p/${slug}/${producto.slug}`
+}
+
+async function copiarLinkPublico(producto: Producto) {
+  const link = linkPublico(producto)
+  if (!link) {
+    toast.warning('La tienda no tiene slug configurado')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(link)
+    toast.success('Link de pedido copiado')
+  } catch {
+    toast.error('No se pudo copiar')
+  }
+}
 
 // Modal
 const modalVisible = ref(false)
@@ -166,13 +188,22 @@ onMounted(() => {
           <span class="text-sm font-bold text-navy">${{ producto.precio.toFixed(2) }}</span>
         </div>
 
-        <!-- Botón eliminar -->
-        <button
-          @click.stop="eliminar(producto)"
-          class="mt-3 text-xs text-alerta/60 hover:text-alerta font-medium opacity-0 group-hover:opacity-100 transition"
-        >
-          <i class="pi pi-trash"></i> Eliminar
-        </button>
+        <!-- Acciones -->
+        <div class="mt-3 flex gap-3 items-center">
+          <button
+            @click.stop="copiarLinkPublico(producto)"
+            class="text-xs font-bold text-mauve hover:underline flex items-center gap-1"
+            title="Copiar link del formulario público para enviar al cliente"
+          >
+            <i class="pi pi-link" aria-hidden="true"></i> Link pedido
+          </button>
+          <button
+            @click.stop="eliminar(producto)"
+            class="text-xs text-alerta/60 hover:text-alerta font-medium opacity-0 group-hover:opacity-100 transition"
+          >
+            <i class="pi pi-trash"></i> Eliminar
+          </button>
+        </div>
       </div>
     </div>
 
