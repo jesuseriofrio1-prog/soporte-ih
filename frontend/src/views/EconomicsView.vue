@@ -176,7 +176,7 @@ watch(() => tiendaStore.tiendaActivaId, () => {
       <button
         @click="router.push('/catalogo')"
         class="h-8 px-3 rounded-md text-[11px] font-medium hover:opacity-90 transition shrink-0"
-        style="background: var(--amber-fg); color: var(--amber-bg);"
+        style="background: var(--amber-fg); color: var(--paper);"
       >
         Configurar en catálogo →
       </button>

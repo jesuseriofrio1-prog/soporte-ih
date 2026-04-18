@@ -404,10 +404,10 @@ onMounted(() => {
       :style="{ width: '450px' }"
       :pt="{
         root: { class: 'border border-lavanda-medio rounded-xl' },
-        header: { class: 'bg-navy text-white rounded-t-xl p-4' },
+        header: { class: 'bg-ink text-paper rounded-t-xl p-4' },
         title: { class: 'font-bold text-lg' },
         content: { class: 'p-6' },
-        headerActions: { class: 'text-white' },
+        headerActions: { class: 'text-paper' },
       }"
     >
       <form @submit.prevent="guardar" class="space-y-4">

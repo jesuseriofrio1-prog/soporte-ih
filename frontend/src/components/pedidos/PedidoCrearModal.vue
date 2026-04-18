@@ -148,10 +148,10 @@ function guardar() {
     :style="{ width: '520px' }"
     :pt="{
       root: { class: 'border border-lavanda-medio rounded-xl' },
-      header: { class: 'bg-navy text-white rounded-t-xl p-4' },
+      header: { class: 'bg-ink text-paper rounded-t-xl p-4' },
       title: { class: 'font-bold text-lg' },
       content: { class: 'p-6' },
-      headerActions: { class: 'text-white' },
+      headerActions: { class: 'text-paper' },
     }"
   >
     <form @submit.prevent="guardar" class="space-y-4">
@@ -235,7 +235,7 @@ function guardar() {
             type="button"
             @click="verificarDireccion"
             :disabled="verificandoDireccion || !form.direccion.trim()"
-            class="text-[11px] font-medium hover:underline disabled:opacity-40"
+            class="text-[11px] font-semibold px-2 py-1 rounded border hairline hover:bg-paper-alt transition disabled:opacity-40"
             style="color: var(--accent);"
             title="Analiza la dirección con IA antes de enviar a Rocket"
           >

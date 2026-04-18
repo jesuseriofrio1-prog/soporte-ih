@@ -30,17 +30,27 @@ export const ESTADO_LABELS: Record<string, string> = {
   DEVUELTO: 'Devuelto',
 }
 
+/**
+ * Pills para cada estado usando tokens CSS del design system (adaptivos a
+ * dark mode). Solo tenemos 4 colores de pill (emerald/amber/blue/rose), así
+ * que agrupamos estados por "tono" lógico:
+ *  - gris/pendiente: bg neutral
+ *  - azul (en progreso): CONFIRMADO, EN_PREPARACION, ENVIADO, EN_RUTA
+ *  - amber (requiere atención): NOVEDAD, RETIRO_EN_AGENCIA
+ *  - emerald (éxito): ENTREGADO
+ *  - rose (fracaso): NO_ENTREGADO, DEVUELTO
+ */
 export const ESTADO_BADGE: Record<string, string> = {
-  PENDIENTE: 'bg-gray-100 text-gray-700',
-  CONFIRMADO: 'bg-blue-100 text-blue-700',
-  EN_PREPARACION: 'bg-indigo-100 text-indigo-700',
-  ENVIADO: 'bg-cyan-100 text-cyan-700',
-  EN_RUTA: 'bg-yellow-100 text-yellow-700',
-  NOVEDAD: 'bg-orange-100 text-orange-700',
-  RETIRO_EN_AGENCIA: 'bg-purple-100 text-purple-700',
-  ENTREGADO: 'bg-green-100 text-green-700',
-  NO_ENTREGADO: 'bg-red-100 text-red-700',
-  DEVUELTO: 'bg-red-200 text-red-800',
+  PENDIENTE: 'bg-paper-alt text-ink-muted',
+  CONFIRMADO: 'pill-blue',
+  EN_PREPARACION: 'pill-blue',
+  ENVIADO: 'pill-blue',
+  EN_RUTA: 'pill-blue',
+  NOVEDAD: 'pill-amber',
+  RETIRO_EN_AGENCIA: 'pill-amber',
+  ENTREGADO: 'pill-emerald',
+  NO_ENTREGADO: 'pill-rose',
+  DEVUELTO: 'pill-rose',
 }
 
 /** Prioridad para ordenar por flujo lógico del pedido (no alfabético). */
@@ -68,20 +78,20 @@ export function diasRetencion(retencionInicio: string | null): number {
   return Math.floor((Date.now() - inicio) / (1000 * 60 * 60 * 24))
 }
 
-/** Clases Tailwind para el pill de retención según días. */
+/** Clases para el pill de retención según días (tokens del design system). */
 export function retencionColor(dias: number): string {
   if (dias < 0) return ''
-  if (dias <= 4) return 'text-green-600 bg-green-50 border-green-200'
-  if (dias <= 6) return 'text-yellow-600 bg-yellow-50 border-yellow-200'
-  return 'text-red-600 bg-red-50 border-red-200'
+  if (dias <= 4) return 'pill-emerald border hairline'
+  if (dias <= 6) return 'pill-amber border hairline'
+  return 'pill-rose border hairline'
 }
 
 /** Clase del punto indicador (con pulse en estado crítico). */
 export function retencionDotColor(dias: number): string {
   if (dias < 0) return ''
-  if (dias <= 4) return 'bg-green-500'
-  if (dias <= 6) return 'bg-yellow-500'
-  return 'bg-red-500 animate-pulse'
+  if (dias <= 4) return 'dot-emerald'
+  if (dias <= 6) return 'dot-amber'
+  return 'dot-rose animate-pulse'
 }
 
 /** True si la fila debe resaltarse en rojo en la tabla. */

@@ -301,10 +301,10 @@ onMounted(() => {
       :style="{ width: '420px' }"
       :pt="{
         root: { class: 'border-l border-lavanda-medio' },
-        header: { class: 'bg-navy text-white p-4' },
+        header: { class: 'bg-ink text-paper p-4' },
         title: { class: 'font-bold text-lg' },
         content: { class: 'p-0' },
-        headerActions: { class: 'text-white' },
+        headerActions: { class: 'text-paper' },
       }"
     >
       <template #header>
@@ -320,7 +320,7 @@ onMounted(() => {
       <div v-else-if="store.clienteActivo" class="flex flex-col h-full">
         <!-- Cabecera del cliente -->
         <div class="bg-lavanda/50 p-6 text-center border-b border-lavanda-medio">
-          <div class="w-16 h-16 bg-navy rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-3">
+          <div class="w-16 h-16 bg-ink rounded-full flex items-center justify-center text-paper text-xl font-bold mx-auto mb-3">
             {{ iniciales(store.clienteActivo.nombre) }}
           </div>
           <h3 class="text-lg font-bold text-navy">{{ store.clienteActivo.nombre }}</h3>
@@ -443,10 +443,10 @@ onMounted(() => {
       :style="{ width: '420px' }"
       :pt="{
         root: { class: 'border border-lavanda-medio rounded-xl' },
-        header: { class: 'bg-navy text-white rounded-t-xl p-4' },
+        header: { class: 'bg-ink text-paper rounded-t-xl p-4' },
         title: { class: 'font-bold text-lg' },
         content: { class: 'p-6' },
-        headerActions: { class: 'text-white' },
+        headerActions: { class: 'text-paper' },
       }"
     >
       <form @submit.prevent="guardarNuevoCliente" class="space-y-4">
