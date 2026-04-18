@@ -26,27 +26,21 @@ async function bootstrap() {
       }),
     );
 
-    // CORS: exige FRONTEND_URL en producción. En dev permite localhost.
+    // CORS:
+    // - En el deploy unificado (frontend + backend en el mismo proyecto Vercel)
+    //   no hay cross-origin y CORS no es necesario.
+    // - Si FRONTEND_URL está seteada (deploy separado o dominio adicional), la
+    //   honramos como origen permitido.
+    // - En dev permitimos localhost:5173 para `npm run dev:frontend`.
     const isProd = process.env.NODE_ENV === 'production';
     const origins: string[] = [];
 
-    if (process.env.FRONTEND_URL) {
-      origins.push(process.env.FRONTEND_URL);
-    }
-    if (!isProd) {
-      origins.push('http://localhost:5173');
-    }
+    if (process.env.FRONTEND_URL) origins.push(process.env.FRONTEND_URL);
+    if (!isProd) origins.push('http://localhost:5173');
 
-    if (origins.length === 0) {
-      throw new Error(
-        'FRONTEND_URL es requerido en producción. Configura la variable de entorno.',
-      );
+    if (origins.length > 0) {
+      nestApp.enableCors({ origin: origins, credentials: true });
     }
-
-    nestApp.enableCors({
-      origin: origins,
-      credentials: true,
-    });
 
     await nestApp.init();
     app = nestApp;

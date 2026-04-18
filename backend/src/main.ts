@@ -20,7 +20,8 @@ async function bootstrap() {
     }),
   );
 
-  // CORS: en producción exige FRONTEND_URL; en dev permite localhost:5173.
+  // CORS: en deploy unificado no es necesario (same-origin). Sólo se activa
+  // si FRONTEND_URL está seteada (deploy separado) o en dev para localhost.
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
   const frontendUrl = configService.get<string>('FRONTEND_URL');
   const origins: string[] = [];
@@ -28,16 +29,9 @@ async function bootstrap() {
   if (frontendUrl) origins.push(frontendUrl);
   if (nodeEnv !== 'production') origins.push('http://localhost:5173');
 
-  if (origins.length === 0) {
-    throw new Error(
-      'FRONTEND_URL es requerido en producción. Configura la variable de entorno.',
-    );
+  if (origins.length > 0) {
+    app.enableCors({ origin: origins, credentials: true });
   }
-
-  app.enableCors({
-    origin: origins,
-    credentials: true,
-  });
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
