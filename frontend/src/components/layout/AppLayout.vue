@@ -64,7 +64,6 @@ function recargarDatosTienda() {
   pedidosStore.fetchPedidos()
   clientesStore.fetchClientes()
   cargarSolicitudesStats()
-  aplicarAccentTienda()
 }
 
 onMounted(async () => {
@@ -82,19 +81,6 @@ watch(() => tiendaStore.tiendaActivaId, (tiendaId) => {
   recargarDatosTienda()
   if (tiendaId) requestPermission(tiendaId).catch(() => {})
 })
-
-/**
- * Cada tienda puede tener su propio color. Lo mapeamos a --accent
- * para que el acento visual (dots, nav active bar, botones primarios)
- * refleje la identidad de la tienda activa.
- */
-function aplicarAccentTienda() {
-  const tienda = tiendaStore.tiendaActiva
-  if (!tienda) return
-  if (tienda.color_primario) {
-    document.documentElement.style.setProperty('--accent', tienda.color_primario)
-  }
-}
 
 function seleccionarTienda(id: string) {
   tiendaStore.setTiendaActiva(id)

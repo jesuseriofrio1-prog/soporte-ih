@@ -87,9 +87,13 @@ onMounted(async () => {
 
 function aplicarColores() {
   if (!tienda.value) return
-  document.documentElement.style.setProperty('--brand-primary', tienda.value.color_primario || '#030363')
-  document.documentElement.style.setProperty('--brand-secondary', tienda.value.color_secundario || '#C49BC2')
-  document.documentElement.style.setProperty('--brand-fondo', tienda.value.color_fondo || '#E6E6FB')
+  // Los colores por tienda se eliminaron; usamos tokens del design system.
+  // Estos alias --brand-* se mantienen como puente para no reescribir cada
+  // referencia del template.
+  const root = document.documentElement
+  root.style.setProperty('--brand-primary', 'var(--ink)')
+  root.style.setProperty('--brand-secondary', 'var(--accent-soft)')
+  root.style.setProperty('--brand-fondo', 'var(--paper-alt)')
   document.title = `Comprar en ${tienda.value.nombre}`
 }
 

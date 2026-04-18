@@ -103,9 +103,8 @@ function abrirWhatsApp() {
 }
 
 function aplicarColores(d: TrackingData) {
-  if (d.tienda.color_primario) {
-    document.documentElement.style.setProperty('--accent', d.tienda.color_primario)
-  }
+  // Colores por tienda eliminados; mantenemos el accent del design
+  // system. Sólo ajustamos el título para el branding básico.
   document.title = `Tu pedido — ${d.tienda.nombre}`
 }
 
@@ -155,7 +154,7 @@ onMounted(async () => {
       <!-- Tracking -->
       <div v-else-if="data" class="surface rounded-2xl overflow-hidden" style="box-shadow: var(--shadow-md);">
         <!-- Header branding -->
-        <div class="p-6 text-white" :style="{ background: data.tienda.color_primario || 'var(--ink)' }">
+        <div class="p-6 text-white" style="background: var(--ink);">
           <div class="flex items-center gap-3">
             <img
               v-if="data.tienda.logo_url"
@@ -221,7 +220,7 @@ onMounted(async () => {
                 v-if="i < 3"
                 class="absolute top-4 left-1/2 right-0 h-0.5 -translate-y-1/2"
                 :style="{
-                  background: (i + 1) < pasoActual ? (data.tienda.color_primario || 'var(--ink)') : 'var(--line)',
+                  background: (i + 1) < pasoActual ? 'var(--ink)' : 'var(--line)',
                   width: 'calc(100% - 16px)',
                   marginLeft: '8px',
                 }"
@@ -229,7 +228,7 @@ onMounted(async () => {
               <div
                 class="w-8 h-8 rounded-full grid place-items-center mx-auto mb-1.5 text-[12px] relative z-10 transition"
                 :style="(i + 1) <= pasoActual
-                  ? { background: data.tienda.color_primario || 'var(--ink)', color: '#fff' }
+                  ? { background: 'var(--ink)', color: 'var(--paper)' }
                   : { background: 'var(--paper-alt)', color: 'var(--ink-faint)' }"
               >
                 {{ paso.icon }}

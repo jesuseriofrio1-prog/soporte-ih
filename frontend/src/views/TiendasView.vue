@@ -14,35 +14,19 @@ const editando = ref(false)
 const editId = ref<string | null>(null)
 const form = ref({
   nombre: '',
-  color_primario: '#0a0a0a',
-  color_secundario: '#e11d48',
-  color_fondo: '#fafaf9',
-  color_borde: '#e7e5e4',
 })
 
 function abrirCrear() {
   editando.value = false
   editId.value = null
-  form.value = {
-    nombre: '',
-    color_primario: '#0a0a0a',
-    color_secundario: '#e11d48',
-    color_fondo: '#fafaf9',
-    color_borde: '#e7e5e4',
-  }
+  form.value = { nombre: '' }
   modalVisible.value = true
 }
 
 function abrirEditar(tienda: Tienda) {
   editando.value = true
   editId.value = tienda.id
-  form.value = {
-    nombre: tienda.nombre,
-    color_primario: tienda.color_primario || '#0a0a0a',
-    color_secundario: tienda.color_secundario || '#e11d48',
-    color_fondo: tienda.color_fondo || '#fafaf9',
-    color_borde: tienda.color_borde || '#e7e5e4',
-  }
+  form.value = { nombre: tienda.nombre }
   modalVisible.value = true
 }
 
@@ -56,19 +40,11 @@ async function guardar() {
     if (editando.value && editId.value) {
       await tiendaStore.editarTienda(editId.value, {
         nombre: form.value.nombre,
-        color_primario: form.value.color_primario,
-        color_secundario: form.value.color_secundario,
-        color_fondo: form.value.color_fondo,
-        color_borde: form.value.color_borde,
       })
       toast.success('Tienda actualizada')
     } else {
       await tiendaStore.crearTienda({
         nombre: form.value.nombre,
-        color_primario: form.value.color_primario,
-        color_secundario: form.value.color_secundario,
-        color_fondo: form.value.color_fondo,
-        color_borde: form.value.color_borde,
       })
       toast.success('Tienda creada')
     }
@@ -131,14 +107,6 @@ onMounted(() => {
         class="surface rounded-xl p-5 transition hover:shadow-md"
         :class="{ 'opacity-60': !tienda.estado }"
       >
-        <!-- Barra de colores de la tienda -->
-        <div class="flex gap-1 mb-4 h-1.5 rounded-full overflow-hidden">
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_primario || 'var(--ink)' }"></div>
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_secundario || 'var(--accent)' }"></div>
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_fondo || 'var(--paper-alt)' }"></div>
-          <div class="flex-1 rounded-full" :style="{ backgroundColor: tienda.color_borde || 'var(--line)' }"></div>
-        </div>
-
         <div class="flex items-start justify-between mb-3">
           <div class="min-w-0">
             <h4 class="h-display text-[20px] leading-tight truncate">{{ tienda.nombre }}</h4>
@@ -223,29 +191,6 @@ onMounted(() => {
             placeholder="Mi Tienda"
             class="w-full px-3 py-2 border hairline rounded-md bg-paper-alt text-[13px] text-ink focus:outline-none focus:border-accent transition"
           />
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div v-for="field in [
-            { key: 'color_primario', label: 'Primario (accent)' },
-            { key: 'color_secundario', label: 'Secundario' },
-            { key: 'color_fondo', label: 'Fondo' },
-            { key: 'color_borde', label: 'Borde' },
-          ]" :key="field.key">
-            <label class="block text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1.5">
-              {{ field.label }}
-            </label>
-            <div class="flex items-center gap-2">
-              <input
-                v-model="form[field.key as 'color_primario' | 'color_secundario' | 'color_fondo' | 'color_borde']"
-                type="color"
-                class="w-8 h-8 rounded cursor-pointer border-0"
-              />
-              <span class="text-[11px] font-mono tabular text-ink-faint">
-                {{ form[field.key as 'color_primario' | 'color_secundario' | 'color_fondo' | 'color_borde'] }}
-              </span>
-            </div>
-          </div>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
