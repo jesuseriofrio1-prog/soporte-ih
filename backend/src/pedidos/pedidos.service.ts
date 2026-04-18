@@ -39,7 +39,13 @@ export class PedidosService {
       query = query.eq('tienda_id', filtros.tienda_id);
     }
     if (filtros.estado) {
-      query = query.eq('estado', filtros.estado);
+      // Acepta múltiples estados separados por coma: "NOVEDAD,NO_ENTREGADO"
+      const estados = filtros.estado.split(',').map((e) => e.trim()).filter(Boolean);
+      if (estados.length === 1) {
+        query = query.eq('estado', estados[0]);
+      } else if (estados.length > 1) {
+        query = query.in('estado', estados);
+      }
     }
     if (filtros.producto_id) {
       query = query.eq('producto_id', filtros.producto_id);

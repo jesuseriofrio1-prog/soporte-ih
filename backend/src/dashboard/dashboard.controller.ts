@@ -15,6 +15,11 @@ export class DashboardController {
     return this.dashboardService.getVentasSemana(tienda_id);
   }
 
+  @Get('pedidos-semana')
+  getPedidosSemana(@Query('tienda_id') tienda_id: string) {
+    return this.dashboardService.getPedidosSemana(tienda_id);
+  }
+
   @Get('canales')
   getCanalesStats(@Query('tienda_id') tienda_id: string) {
     return this.dashboardService.getCanalesStats(tienda_id);

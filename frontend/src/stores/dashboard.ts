@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import dashboardService, {
   type DashboardStats,
   type VentaDia,
+  type PedidoDia,
   type CanalStat,
 } from '../services/dashboardService'
 import { useTiendaStore } from './tienda'
@@ -10,6 +11,7 @@ import { useTiendaStore } from './tienda'
 export const useDashboardStore = defineStore('dashboard', () => {
   const stats = ref<DashboardStats | null>(null)
   const ventasSemana = ref<VentaDia[]>([])
+  const pedidosSemana = ref<PedidoDia[]>([])
   const canalesStats = ref<CanalStat[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -22,13 +24,15 @@ export const useDashboardStore = defineStore('dashboard', () => {
     loading.value = true
     error.value = null
     try {
-      const [s, v, c] = await Promise.all([
+      const [s, v, p, c] = await Promise.all([
         dashboardService.getStats(tiendaId),
         dashboardService.getVentasSemana(tiendaId),
+        dashboardService.getPedidosSemana(tiendaId),
         dashboardService.getCanalesStats(tiendaId),
       ])
       stats.value = s
       ventasSemana.value = v
+      pedidosSemana.value = p
       canalesStats.value = c
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
@@ -38,5 +42,5 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  return { stats, ventasSemana, canalesStats, loading, error, fetchAll }
+  return { stats, ventasSemana, pedidosSemana, canalesStats, loading, error, fetchAll }
 })

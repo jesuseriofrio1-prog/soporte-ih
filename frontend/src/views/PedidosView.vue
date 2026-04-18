@@ -247,6 +247,51 @@ function aplicarFiltroProducto() {
   pedidosStore.setFiltro('producto_id', filtroProducto.value || undefined)
 }
 
+// ─────────────────────────────────────────────
+// Chips de antigüedad (cliente-side, sobre la lista ya cargada)
+// ─────────────────────────────────────────────
+
+type AntiguedadKey = 'todos' | 'hoy' | '1d' | '2d' | '3plus' | 'aplazados'
+
+const filtroAntiguedad = ref<AntiguedadKey>('todos')
+
+// Estados "activos" = todavía no cerrados (aún requieren acción)
+const ESTADOS_ACTIVOS = ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION'] as const
+
+function diasDesde(iso: string): number {
+  const ms = Date.now() - new Date(iso).getTime()
+  return Math.floor(ms / (1000 * 60 * 60 * 24))
+}
+
+function matchesAntiguedad(p: Pedido, filtro: AntiguedadKey): boolean {
+  if (filtro === 'todos') return true
+  if (filtro === 'aplazados') return p.retencion_inicio !== null
+
+  // El resto de chips solo aplica a pedidos activos
+  if (!ESTADOS_ACTIVOS.includes(p.estado as typeof ESTADOS_ACTIVOS[number])) return false
+
+  const dias = diasDesde(p.created_at)
+  switch (filtro) {
+    case 'hoy': return dias === 0
+    case '1d': return dias === 1
+    case '2d': return dias === 2
+    case '3plus': return dias >= 3
+    default: return true
+  }
+}
+
+const chipsAntiguedad = computed(() => {
+  const countFor = (k: AntiguedadKey) => pedidosStore.pedidos.filter((p) => matchesAntiguedad(p, k)).length
+  return [
+    { key: 'todos' as const,     label: 'Todos',          count: pedidosStore.pedidos.length },
+    { key: 'hoy' as const,       label: 'Nuevos hoy',     count: countFor('hoy') },
+    { key: '1d' as const,        label: 'Pendientes 1d',  count: countFor('1d') },
+    { key: '2d' as const,        label: 'Pendientes 2d',  count: countFor('2d') },
+    { key: '3plus' as const,     label: 'Pendientes +3d', count: countFor('3plus') },
+    { key: 'aplazados' as const, label: 'Aplazados',      count: countFor('aplazados') },
+  ]
+})
+
 // Sincronizar Servientrega
 const sincronizando = ref(false)
 
@@ -288,7 +333,8 @@ function getEstadoPrioridad(estado: string): number {
 }
 
 const pedidosOrdenados = computed(() => {
-  const lista = [...pedidosStore.pedidos]
+  // Primero filtramos por el chip de antigüedad activo, luego ordenamos
+  const lista = pedidosStore.pedidos.filter((p) => matchesAntiguedad(p, filtroAntiguedad.value))
   if (!sortKey.value) return lista
 
   return lista.sort((a, b) => {
@@ -494,6 +540,27 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6">
+    <!-- Chips de antigüedad -->
+    <div class="bg-white p-3 rounded-xl shadow-sm border border-lavanda-medio flex flex-wrap gap-2">
+      <button
+        v-for="chip in chipsAntiguedad"
+        :key="chip.key"
+        @click="filtroAntiguedad = chip.key"
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold transition border"
+        :class="filtroAntiguedad === chip.key
+          ? 'bg-mauve text-white border-mauve shadow-sm'
+          : 'bg-white text-navy border-lavanda-medio hover:bg-lavanda/30'"
+      >
+        <span>{{ chip.label }}</span>
+        <span
+          class="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 text-[11px] rounded-full"
+          :class="filtroAntiguedad === chip.key ? 'bg-white/25 text-white' : 'bg-lavanda/60 text-navy/70'"
+        >
+          {{ chip.count }}
+        </span>
+      </button>
+    </div>
+
     <!-- Barra de filtros -->
     <div class="bg-white p-4 rounded-xl shadow-sm border border-lavanda-medio flex flex-wrap gap-4 items-center justify-between">
       <div class="flex items-center gap-3 flex-wrap">

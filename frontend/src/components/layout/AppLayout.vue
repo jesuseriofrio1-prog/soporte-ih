@@ -68,12 +68,18 @@ function cambiarTienda(event: Event) {
 
 const pageTitle = computed(() => (route.meta.title as string) || 'Soporte IH')
 
-const navItems = [
-  { name: 'Dashboard', route: '/dashboard', icon: 'pi pi-chart-line' },
-  { name: 'Envíos / Pedidos', route: '/pedidos', icon: 'pi pi-truck' },
-  { name: 'Catálogo', route: '/catalogo', icon: 'pi pi-box' },
-  { name: 'Clientes', route: '/clientes', icon: 'pi pi-users' },
-]
+const navItems = computed(() => [
+  { name: 'Dashboard', route: '/dashboard', icon: 'pi pi-chart-line', badge: 0 },
+  { name: 'Envíos / Pedidos', route: '/pedidos', icon: 'pi pi-truck', badge: 0 },
+  {
+    name: 'Novedades',
+    route: '/novedades',
+    icon: 'pi pi-exclamation-triangle',
+    badge: dashStore.stats?.novedades || 0,
+  },
+  { name: 'Catálogo', route: '/catalogo', icon: 'pi pi-box', badge: 0 },
+  { name: 'Clientes', route: '/clientes', icon: 'pi pi-users', badge: 0 },
+])
 
 const sidebarOpen = ref(false)
 
@@ -146,7 +152,14 @@ const storageBarColor = computed(() => {
           :style="isActive(item.route) ? { backgroundColor: tiendaStore.tiendaActiva?.color_secundario || '#C49BC2' } : {}"
         >
           <i :class="item.icon" class="w-5 text-center"></i>
-          <span>{{ item.name }}</span>
+          <span class="flex-1">{{ item.name }}</span>
+          <span
+            v-if="item.badge > 0"
+            class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold rounded-full bg-red-500 text-white"
+            :aria-label="`${item.badge} pendientes`"
+          >
+            {{ item.badge > 99 ? '99+' : item.badge }}
+          </span>
         </a>
 
         <!-- Separador -->

@@ -22,6 +22,12 @@ const routes = [
         meta: { title: 'Envíos / Pedidos' },
       },
       {
+        path: 'novedades',
+        name: 'novedades',
+        component: () => import('../views/NovedadesView.vue'),
+        meta: { title: 'Novedades' },
+      },
+      {
         path: 'catalogo',
         name: 'catalogo',
         component: () => import('../views/CatalogoView.vue'),

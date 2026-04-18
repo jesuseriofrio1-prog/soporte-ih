@@ -23,37 +23,62 @@ const router = useRouter()
 const dashStore = useDashboardStore()
 const productosStore = useProductosStore()
 
-// Producto con menor stock (solo si hay productos)
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+
+function formatMoney(val: number | null | undefined): string {
+  return (val || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function formatTimestamp(iso: string | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+// ─────────────────────────────────────────────
+// Producto con menor stock
+// ─────────────────────────────────────────────
+
 const productoMenorStock = computed(() => {
   if (productosStore.productos.length === 0) return null
   return [...productosStore.productos].sort((a, b) => a.stock - b.stock)[0]
 })
 
-// Datos del chart
-const chartData = computed(() => {
-  const labels = dashStore.ventasSemana.map((v) => v.dia)
-  const data = dashStore.ventasSemana.map((v) => Number(v.total))
-
-  return {
-    labels,
-    datasets: [
-      {
-        label: 'Ventas ($)',
-        data,
-        borderColor: '#C49BC2',
-        backgroundColor: 'rgba(196, 155, 194, 0.15)',
-        pointBackgroundColor: '#030363',
-        pointBorderColor: '#030363',
-        pointRadius: 5,
-        pointHoverRadius: 7,
-        tension: 0.3,
-        fill: true,
-      },
-    ],
-  }
+const transitoTexto = computed(() => {
+  const n = dashStore.stats?.en_transito || 0
+  if (n === 0) return 'Sin envíos activos'
+  return `${n} envío${n > 1 ? 's' : ''} en curso`
 })
 
-const chartOptions = {
+// ─────────────────────────────────────────────
+// Chart 1: Facturación últimos 7 días
+// ─────────────────────────────────────────────
+
+const ventasChartData = computed(() => ({
+  labels: dashStore.ventasSemana.map((v) => v.dia),
+  datasets: [
+    {
+      label: 'Ventas ($)',
+      data: dashStore.ventasSemana.map((v) => Number(v.total)),
+      borderColor: '#C49BC2',
+      backgroundColor: 'rgba(196, 155, 194, 0.15)',
+      pointBackgroundColor: '#030363',
+      pointBorderColor: '#030363',
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      tension: 0.3,
+      fill: true,
+    },
+  ],
+}))
+
+const ventasChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -65,7 +90,8 @@ const chartOptions = {
       padding: 10,
       cornerRadius: 8,
       callbacks: {
-        label: (ctx: any) => `$${ctx.parsed.y.toFixed(2)}`,
+        label: (ctx: { parsed: { y: number | null } }) =>
+          `$${(ctx.parsed.y ?? 0).toFixed(2)}`,
       },
     },
   },
@@ -78,31 +104,109 @@ const chartOptions = {
       grid: { color: '#E6E6FB' },
       ticks: {
         color: '#030363',
-        callback: (value: any) => `$${value}`,
+        callback: (value: string | number) => `$${value}`,
       },
     },
   },
 }
 
-// Colores para canales
-const CANAL_COLORES = [
-  '#C49BC2', '#030363', '#25D366', '#C8C8E9', '#EF4444', '#3B82F6', '#F59E0B',
-]
+// ─────────────────────────────────────────────
+// Chart 2: Pedidos últimos 7 días (3 series)
+// ─────────────────────────────────────────────
 
-const canalesChartData = computed(() => {
-  const canales = dashStore.canalesStats
-  return {
-    labels: canales.map((c) => c.canal),
-    datasets: [
-      {
-        data: canales.map((c) => Number(c.total)),
-        backgroundColor: CANAL_COLORES.slice(0, canales.length),
-        borderWidth: 2,
-        borderColor: '#FFFFFF',
+const pedidosChartData = computed(() => ({
+  labels: dashStore.pedidosSemana.map((p) => p.dia),
+  datasets: [
+    {
+      label: 'Entrantes',
+      data: dashStore.pedidosSemana.map((p) => Number(p.entrantes)),
+      borderColor: '#3B82F6',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      pointBackgroundColor: '#3B82F6',
+      pointRadius: 4,
+      tension: 0.3,
+      fill: false,
+    },
+    {
+      label: 'Confirmados',
+      data: dashStore.pedidosSemana.map((p) => Number(p.confirmados)),
+      borderColor: '#C49BC2',
+      backgroundColor: 'rgba(196, 155, 194, 0.1)',
+      pointBackgroundColor: '#C49BC2',
+      pointRadius: 4,
+      tension: 0.3,
+      fill: false,
+    },
+    {
+      label: 'Entregados',
+      data: dashStore.pedidosSemana.map((p) => Number(p.entregados)),
+      borderColor: '#22C55E',
+      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+      pointBackgroundColor: '#22C55E',
+      pointRadius: 4,
+      tension: 0.3,
+      fill: false,
+    },
+  ],
+}))
+
+const pedidosChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'bottom' as const,
+      labels: {
+        color: '#030363',
+        font: { size: 11, weight: 'bold' as const },
+        padding: 12,
+        usePointStyle: true,
+        pointStyleWidth: 10,
       },
-    ],
-  }
-})
+    },
+    tooltip: {
+      backgroundColor: '#030363',
+      titleColor: '#FFFFFF',
+      bodyColor: '#FFFFFF',
+      padding: 10,
+      cornerRadius: 8,
+    },
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { color: '#030363', font: { weight: 'bold' as const } },
+    },
+    y: {
+      grid: { color: '#E6E6FB' },
+      ticks: {
+        color: '#030363',
+        stepSize: 1,
+        precision: 0,
+      },
+      beginAtZero: true,
+    },
+  },
+}
+
+// ─────────────────────────────────────────────
+// Chart canales (doughnut)
+// ─────────────────────────────────────────────
+
+const CANAL_COLORES = ['#C49BC2', '#030363', '#25D366', '#C8C8E9', '#EF4444', '#3B82F6', '#F59E0B']
+
+const canalesChartData = computed(() => ({
+  labels: dashStore.canalesStats.map((c) => c.canal),
+  datasets: [
+    {
+      data: dashStore.canalesStats.map((c) => Number(c.total)),
+      backgroundColor: CANAL_COLORES.slice(0, dashStore.canalesStats.length),
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+    },
+  ],
+}))
 
 const canalesChartOptions = {
   responsive: true,
@@ -129,44 +233,74 @@ const canalesChartOptions = {
   },
 }
 
-function formatMoney(val: number): string {
-  return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-// Texto dinámico para tránsito
-const transitoTexto = computed(() => {
-  const n = dashStore.stats?.en_transito || 0
-  if (n === 0) return 'Sin envíos activos'
-  return `${n} envío${n > 1 ? 's' : ''} en curso`
-})
+// ─────────────────────────────────────────────
+// Lifecycle
+// ─────────────────────────────────────────────
 
 onMounted(() => {
   dashStore.fetchAll()
   productosStore.fetchProductos(true)
 })
+
+function refrescar() {
+  dashStore.fetchAll()
+  productosStore.fetchProductos(true)
+}
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Loading -->
-    <div v-if="dashStore.loading" class="text-center py-20">
-      <i class="pi pi-spin pi-spinner text-4xl text-mauve"></i>
+    <!-- Timestamp + refresh -->
+    <div class="flex items-center gap-3 text-xs text-navy/60">
+      <span>
+        Actualizado:
+        <b v-if="dashStore.stats">{{ formatTimestamp(dashStore.stats.actualizado_en) }}</b>
+        <span v-else>—</span>
+      </span>
+      <button
+        @click="refrescar"
+        :disabled="dashStore.loading"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-lavanda-medio hover:bg-lavanda/50 transition text-navy/80 disabled:opacity-50"
+        aria-label="Refrescar dashboard"
+      >
+        <i class="pi pi-refresh" :class="{ 'pi-spin': dashStore.loading }" aria-hidden="true"></i>
+        <span>Refrescar</span>
+      </button>
+    </div>
+
+    <!-- Loading state (solo si no hay stats cacheado — refresh manual deja KPIs visibles) -->
+    <div v-if="dashStore.loading && !dashStore.stats" class="text-center py-20">
+      <i class="pi pi-spin pi-spinner text-4xl text-mauve" aria-hidden="true"></i>
       <p class="text-navy/60 mt-2">Cargando dashboard...</p>
     </div>
 
     <template v-else-if="dashStore.stats">
-      <!-- Stat Cards -->
+      <!-- ================== Stat Cards principales ================== -->
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <!-- Ventas Mes -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio relative overflow-hidden">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio relative overflow-hidden group">
           <div class="absolute right-0 top-0 h-full w-2 bg-mauve"></div>
-          <p class="text-sm font-bold uppercase text-navy/60 mb-1">Ventas Mes</p>
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase text-navy/60">Ventas Mes</p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Suma de montos de TODOS los pedidos creados en el mes actual (sin filtrar por estado)."
+              aria-hidden="true"
+            ></i>
+          </div>
           <p class="text-3xl font-black text-navy">${{ formatMoney(dashStore.stats.ventas_mes) }}</p>
         </div>
 
         <!-- Pedidos Mes -->
         <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <p class="text-sm font-bold uppercase text-navy/60 mb-1">Pedidos Mes</p>
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase text-navy/60">Pedidos Mes</p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Número de pedidos creados este mes, en cualquier estado."
+              aria-hidden="true"
+            ></i>
+          </div>
           <p class="text-3xl font-black text-navy">{{ dashStore.stats.pedidos_mes }}</p>
           <p v-if="dashStore.stats.pedidos_mes > 0" class="text-xs font-bold text-navy/50 mt-2">
             Promedio: ${{ formatMoney(dashStore.stats.promedio_pedido) }} / pedido
@@ -175,7 +309,14 @@ onMounted(() => {
 
         <!-- En Tránsito -->
         <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <p class="text-sm font-bold uppercase text-navy/60 mb-1">En Tránsito / Agencia</p>
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase text-navy/60">En Tránsito / Agencia</p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Pedidos con estado ENVIADO, EN_RUTA o RETIRO_EN_AGENCIA."
+              aria-hidden="true"
+            ></i>
+          </div>
           <p class="text-3xl font-black text-navy">{{ dashStore.stats.en_transito }}</p>
           <p class="text-xs font-bold text-blue-500 mt-2">
             <i class="pi pi-truck" aria-hidden="true"></i> {{ transitoTexto }}
@@ -193,9 +334,16 @@ onMounted(() => {
             v-if="dashStore.stats.riesgo_devolucion > 0"
             class="absolute right-0 top-0 h-full w-2 bg-alerta animate-pulse"
           ></div>
-          <p class="text-sm font-bold uppercase mb-1" :class="dashStore.stats.riesgo_devolucion > 0 ? 'text-alerta' : 'text-navy/60'">
-            Riesgo de Devolución
-          </p>
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase" :class="dashStore.stats.riesgo_devolucion > 0 ? 'text-alerta' : 'text-navy/60'">
+              Riesgo Devolución
+            </p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Pedidos esperando en agencia desde hace 6+ días. Servientrega los devuelve después de 8."
+              aria-hidden="true"
+            ></i>
+          </div>
           <p class="text-3xl font-black" :class="dashStore.stats.riesgo_devolucion > 0 ? 'text-red-600' : 'text-navy'">
             {{ dashStore.stats.riesgo_devolucion }}
           </p>
@@ -212,66 +360,165 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Chart + Insights -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- ================== KPIs fase 1 ================== -->
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <!-- % Confirmación -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase text-navy/60">% Confirmación</p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Porcentaje de pedidos del mes que ya salieron del estado PENDIENTE (fueron confirmados o avanzaron en el flujo)."
+              aria-hidden="true"
+            ></i>
+          </div>
+          <p class="text-3xl font-black text-navy">
+            {{ dashStore.stats.porcentaje_confirmacion }}<span class="text-xl">%</span>
+          </p>
+          <p class="text-xs font-bold text-navy/50 mt-2">
+            {{ dashStore.stats.confirmados_mes }} / {{ dashStore.stats.pedidos_mes }} del mes
+          </p>
+        </div>
+
+        <!-- % Entrega -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase text-navy/60">% Entrega</p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Entregados / (entregados + no entregados + devueltos) del mes. Solo cuenta pedidos ya cerrados, no los que siguen en tránsito."
+              aria-hidden="true"
+            ></i>
+          </div>
+          <p class="text-3xl font-black text-navy">
+            {{ dashStore.stats.porcentaje_entrega }}<span class="text-xl">%</span>
+          </p>
+          <p class="text-xs font-bold text-navy/50 mt-2">
+            {{ dashStore.stats.entregados_mes }} entregados del mes
+          </p>
+        </div>
+
+        <!-- Facturación en tránsito -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase text-navy/60">Fact. en Tránsito</p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Monto total de los pedidos en estado ENVIADO, EN_RUTA o RETIRO_EN_AGENCIA. Aún pueden caerse o devolverse."
+              aria-hidden="true"
+            ></i>
+          </div>
+          <p class="text-3xl font-black text-navy">${{ formatMoney(dashStore.stats.facturacion_en_transito) }}</p>
+          <p class="text-xs font-bold text-blue-500 mt-2">
+            <i class="pi pi-send" aria-hidden="true"></i> En circulación
+          </p>
+        </div>
+
+        <!-- Facturación en novedad -->
+        <div
+          class="p-6 rounded-xl shadow-sm border"
+          :class="dashStore.stats.novedades > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-lavanda-medio'"
+        >
+          <div class="flex items-start justify-between mb-1">
+            <p class="text-sm font-bold uppercase" :class="dashStore.stats.novedades > 0 ? 'text-orange-700' : 'text-navy/60'">
+              Fact. en Novedad
+            </p>
+            <i
+              class="pi pi-info-circle text-navy/40 text-xs cursor-help"
+              title="Monto total de los pedidos con estado NOVEDAD o NO_ENTREGADO. Revísalos en la sección Novedades."
+              aria-hidden="true"
+            ></i>
+          </div>
+          <p class="text-3xl font-black" :class="dashStore.stats.novedades > 0 ? 'text-orange-700' : 'text-navy'">
+            ${{ formatMoney(dashStore.stats.facturacion_en_novedad) }}
+          </p>
+          <p
+            v-if="dashStore.stats.novedades > 0"
+            class="text-xs font-bold text-orange-700 mt-2 cursor-pointer hover:underline"
+            @click="router.push('/novedades')"
+          >
+            <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+            {{ dashStore.stats.novedades }} novedad{{ dashStore.stats.novedades > 1 ? 'es' : '' }}
+          </p>
+          <p v-else class="text-xs font-bold text-green-500 mt-2">
+            <i class="pi pi-check-circle" aria-hidden="true"></i> Sin novedades
+          </p>
+        </div>
+      </div>
+
+      <!-- ================== Charts (dos columnas en lg) ================== -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Chart pedidos semana -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
+          <h3 class="text-lg font-bold text-navy mb-4">Pedidos últimos 7 días</h3>
+          <div class="relative h-64 w-full">
+            <Line
+              v-if="dashStore.pedidosSemana.length > 0"
+              :data="pedidosChartData"
+              :options="pedidosChartOptions"
+            />
+            <div v-else class="flex items-center justify-center h-full">
+              <p class="text-navy/40">Sin datos de pedidos esta semana</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Chart ventas semana -->
-        <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
-          <h3 class="text-lg font-bold text-navy mb-4">Tendencia de Ventas (Últimos 7 días)</h3>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
+          <h3 class="text-lg font-bold text-navy mb-4">Facturación últimos 7 días</h3>
           <div class="relative h-64 w-full">
             <Line
               v-if="dashStore.ventasSemana.length > 0"
-              :data="chartData"
-              :options="chartOptions"
+              :data="ventasChartData"
+              :options="ventasChartOptions"
             />
             <div v-else class="flex items-center justify-center h-full">
               <p class="text-navy/40">Sin datos de ventas esta semana</p>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Panel Insights (solo si hay datos de inventario) -->
-        <div class="bg-navy p-6 rounded-xl shadow-md text-white flex flex-col justify-between relative overflow-hidden">
+      <!-- ================== Panel Insights ================== -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-3 bg-navy p-6 rounded-xl shadow-md text-white relative overflow-hidden">
           <i class="pi pi-sparkles absolute top-4 right-4 text-mauve text-4xl opacity-20" aria-hidden="true"></i>
 
-          <div>
-            <h3 class="text-lg font-black text-mauve flex items-center gap-2 mb-4">
-              Resumen
-            </h3>
+          <h3 class="text-lg font-black text-mauve flex items-center gap-2 mb-4">
+            Resumen
+          </h3>
 
-            <div class="space-y-4">
-              <!-- Alerta inventario -->
-              <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
-                <p class="text-xs font-bold text-lavanda-medio mb-1">
-                  <i class="pi pi-box" aria-hidden="true"></i> Inventario
-                </p>
-                <p v-if="productoMenorStock" class="text-sm font-medium">
-                  <span class="italic">{{ productoMenorStock.nombre }}</span>:
-                  <span class="font-bold text-mauve">{{ productoMenorStock.stock }} uds</span> disponibles
-                </p>
-                <p v-else class="text-sm font-medium text-lavanda-medio">
-                  Agrega productos en el Catálogo
-                </p>
-              </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
+              <p class="text-xs font-bold text-lavanda-medio mb-1">
+                <i class="pi pi-box" aria-hidden="true"></i> Inventario
+              </p>
+              <p v-if="productoMenorStock" class="text-sm font-medium">
+                <span class="italic">{{ productoMenorStock.nombre }}</span>:
+                <span class="font-bold text-mauve">{{ productoMenorStock.stock }} uds</span> disponibles
+              </p>
+              <p v-else class="text-sm font-medium text-lavanda-medio">
+                Agrega productos en el Catálogo
+              </p>
+            </div>
 
-              <!-- Resumen de pedidos -->
-              <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
-                <p class="text-xs font-bold text-lavanda-medio mb-1">
-                  <i class="pi pi-chart-bar" aria-hidden="true"></i> Actividad
-                </p>
-                <p v-if="dashStore.stats.pedidos_mes > 0" class="text-sm font-medium">
-                  {{ dashStore.stats.pedidos_mes }} pedidos este mes por
-                  <span class="font-bold text-mauve">${{ formatMoney(dashStore.stats.ventas_mes) }}</span>
-                </p>
-                <p v-else class="text-sm font-medium text-lavanda-medio">
-                  Sin pedidos este mes
-                </p>
-              </div>
+            <div class="bg-white/10 p-3 rounded-lg border border-lavanda-medio/20 backdrop-blur-sm">
+              <p class="text-xs font-bold text-lavanda-medio mb-1">
+                <i class="pi pi-chart-bar" aria-hidden="true"></i> Actividad
+              </p>
+              <p v-if="dashStore.stats.pedidos_mes > 0" class="text-sm font-medium">
+                {{ dashStore.stats.pedidos_mes }} pedidos este mes por
+                <span class="font-bold text-mauve">${{ formatMoney(dashStore.stats.ventas_mes) }}</span>
+              </p>
+              <p v-else class="text-sm font-medium text-lavanda-medio">
+                Sin pedidos este mes
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Canales de origen (solo si hay datos) -->
+      <!-- ================== Canales ================== -->
       <div v-if="dashStore.canalesStats.length > 0" class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
         <h3 class="text-lg font-bold text-navy mb-4">Pedidos por Canal de Origen</h3>
         <div class="flex flex-col md:flex-row items-center gap-6">
