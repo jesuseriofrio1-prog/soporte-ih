@@ -4,7 +4,6 @@ import {
   IsNumber,
   IsInt,
   IsOptional,
-  IsUUID,
   Matches,
   Min,
 } from 'class-validator';
@@ -32,6 +31,18 @@ export class CreateProductoDto {
   @IsOptional()
   @IsString()
   icono?: string;
+
+  /** Costo unitario total (fábrica + flete). Opcional: si está vacío, no se calcula margen. */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'costo_unitario debe ser numérico' })
+  @Min(0, { message: 'costo_unitario no puede ser negativo' })
+  costo_unitario?: number;
+
+  /** Fee Rocket promedio por unidad de este producto. Opcional. */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'fee_envio debe ser numérico' })
+  @Min(0, { message: 'fee_envio no puede ser negativo' })
+  fee_envio?: number;
 
   @IsString()
   @IsNotEmpty({ message: 'tienda_id es requerido' })

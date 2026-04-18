@@ -43,6 +43,9 @@ const form = ref({
   precio: 0,
   stock: 0,
   icono: '',
+  // Unit economics: 0 se interpreta como "no configurado" al guardar
+  costo_unitario: 0,
+  fee_envio: 0,
 })
 
 const formErrors = ref<Record<string, string>>({})
@@ -50,7 +53,10 @@ const formErrors = ref<Record<string, string>>({})
 function abrirModalCrear() {
   editando.value = false
   productoEditId.value = null
-  form.value = { nombre: '', slug: '', precio: 0, stock: 0, icono: '' }
+  form.value = {
+    nombre: '', slug: '', precio: 0, stock: 0, icono: '',
+    costo_unitario: 0, fee_envio: 0,
+  }
   formErrors.value = {}
   modalVisible.value = true
 }
@@ -64,6 +70,8 @@ function abrirModalEditar(producto: Producto) {
     precio: producto.precio,
     stock: producto.stock,
     icono: producto.icono || '',
+    costo_unitario: producto.costo_unitario ?? 0,
+    fee_envio: producto.fee_envio ?? 0,
   }
   formErrors.value = {}
   modalVisible.value = true
@@ -93,6 +101,11 @@ function validarForm(): boolean {
 async function guardar() {
   if (!validarForm()) return
 
+  // 0 = "no configurado"; enviamos undefined para que el backend lo
+  // deje null y no se vea como $0.00 en el dashboard de economics.
+  const costoPayload = form.value.costo_unitario > 0 ? form.value.costo_unitario : undefined
+  const feePayload = form.value.fee_envio > 0 ? form.value.fee_envio : undefined
+
   try {
     if (editando.value && productoEditId.value) {
       await store.editarProducto(productoEditId.value, {
@@ -100,6 +113,8 @@ async function guardar() {
         precio: form.value.precio,
         stock: form.value.stock,
         icono: form.value.icono || undefined,
+        costo_unitario: costoPayload,
+        fee_envio: feePayload,
       })
       toast.success('Producto actualizado')
     } else {
@@ -109,6 +124,8 @@ async function guardar() {
         precio: form.value.precio,
         stock: form.value.stock,
         icono: form.value.icono || undefined,
+        costo_unitario: costoPayload,
+        fee_envio: feePayload,
       })
       toast.success('Producto creado')
     }
@@ -343,6 +360,52 @@ onMounted(() => {
             />
             <p v-if="formErrors.stock" class="text-xs text-alerta mt-1">{{ formErrors.stock }}</p>
           </div>
+        </div>
+
+        <!-- Unit economics -->
+        <div class="pt-2 border-t hairline">
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-[10px] uppercase tracking-wider text-ink-faint font-semibold">
+              Unit economics (opcional)
+            </label>
+            <span class="text-[10px] text-ink-faint">Usado para calcular margen en /economics</span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[11px] font-medium text-ink-muted mb-1">Costo unitario ($)</label>
+              <input
+                v-model.number="form.costo_unitario"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="6.80"
+                class="w-full px-3 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy text-[13px] focus:outline-none focus:border-mauve transition"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-ink-muted mb-1">Fee Rocket ($/unidad)</label>
+              <input
+                v-model.number="form.fee_envio"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="4.50"
+                class="w-full px-3 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy text-[13px] focus:outline-none focus:border-mauve transition"
+              />
+            </div>
+          </div>
+          <p v-if="form.precio > 0 && form.costo_unitario > 0" class="text-[11px] text-ink-faint mt-2">
+            Margen neto:
+            <span
+              class="font-mono tabular font-medium"
+              :style="(form.precio - form.costo_unitario - form.fee_envio) / form.precio < 0.1
+                ? { color: 'var(--rose-dot)' }
+                : { color: 'var(--emerald-dot)' }"
+            >
+              ${{ (form.precio - form.costo_unitario - form.fee_envio).toFixed(2) }}
+              ({{ (((form.precio - form.costo_unitario - form.fee_envio) / form.precio) * 100).toFixed(1) }}%)
+            </span>
+          </p>
         </div>
 
         <!-- Icono -->

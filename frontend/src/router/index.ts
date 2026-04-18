@@ -80,6 +80,12 @@ const routes = [
         meta: { title: 'Oportunidades de upsell' },
       },
       {
+        path: 'economics',
+        name: 'economics',
+        component: () => import('../views/EconomicsView.vue'),
+        meta: { title: 'Unit economics' },
+      },
+      {
         path: 'solicitudes',
         name: 'solicitudes',
         component: () => import('../views/SolicitudesView.vue'),

@@ -29,4 +29,14 @@ export class UpdateProductoDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'costo_unitario debe ser numérico' })
+  @Min(0)
+  costo_unitario?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'fee_envio debe ser numérico' })
+  @Min(0)
+  fee_envio?: number;
 }

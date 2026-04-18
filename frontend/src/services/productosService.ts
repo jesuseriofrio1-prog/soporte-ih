@@ -8,6 +8,10 @@ export interface Producto {
   stock: number
   icono: string | null
   activo: boolean
+  /** Costo unitario del producto (fábrica + flete). Null si no se configuró. */
+  costo_unitario: number | null
+  /** Fee Rocket promedio por unidad. Null si no se configuró. */
+  fee_envio: number | null
   created_at: string
   updated_at: string
 }
@@ -18,6 +22,8 @@ export interface CreateProductoPayload {
   precio: number
   stock: number
   icono?: string
+  costo_unitario?: number
+  fee_envio?: number
   tienda_id?: string
 }
 
@@ -27,6 +33,8 @@ export interface UpdateProductoPayload {
   stock?: number
   icono?: string
   activo?: boolean
+  costo_unitario?: number
+  fee_envio?: number
 }
 
 const productosService = {
