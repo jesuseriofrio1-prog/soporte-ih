@@ -62,22 +62,21 @@ Vite proxea `/api/*` → `http://localhost:3000` en dev (ver `frontend/vite.conf
 
 ## Tests
 
-Backend (Jest):
-
 ```bash
-npm test -w backend
-# 43/43 tests passing
+# Todo: backend (Jest) + frontend (Vitest)
+npm test
+# 43 backend + 56 frontend = 99 tests passing
 ```
 
-Cobertura principal:
-- `utils.spec.ts` — normalización de teléfono
-- `pedidos.controller.spec.ts` / `pedidos/dto/*.spec.ts` — validación de inputs
-- `tiendas.service.spec.ts` — CRUD con Supabase mockeado
-- `app.controller.spec.ts` — `GET /health`
-- `imports/rocket-excel.parser.spec.ts` — parseo del Excel de Rocket (fixture real)
-- `imports/rocket-estado.map.spec.ts` — mapeo de los 16 estados de Rocket
+Por separado:
+```bash
+npm run test:backend   # Jest
+npm run test:frontend  # Vitest (watch mode: cd frontend && npm run test:watch)
+```
 
-Frontend: sin tests unitarios por ahora.
+Cobertura:
+- **Backend**: utils/teléfono, DTOs de pedidos, CRUD de tiendas, parser de Excel Rocket (fixture real), mapeo de 16 estados Rocket, `GET /health`.
+- **Frontend**: composables (`useTextExtractor` extrae datos de mensajes WhatsApp, `useWhatsApp` normaliza teléfonos ecuatorianos) y stores (`productos`, `auth`) con service mockeado.
 
 ## Base de datos
 

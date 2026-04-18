@@ -37,9 +37,14 @@ function extraerNombre(texto: string, telefono: string | null): string | null {
   const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean)
 
   // Buscar después de "soy", "me llamo", "nombre:"
+  // Usamos [ \t] en vez de \s para NO saltar newlines: así "soy Juan\nquiero"
+  // sólo captura "Juan". Limitamos a 2-4 palabras consecutivas para no
+  // arrastrar más de lo razonable en una sola línea.
+  const NOMBRE_2_4 =
+    '([A-ZÁÉÍÓÚÑa-záéíóúñ]+(?:[ \\t]+[A-ZÁÉÍÓÚÑa-záéíóúñ]+){1,3})'
   const patronesNombre = [
-    /(?:soy|me llamo|nombre:?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]{2,30})/i,
-    /(?:cliente:?)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]{2,30})/i,
+    new RegExp(`(?:soy|me llamo|nombre:?)[ \\t]+${NOMBRE_2_4}`, 'i'),
+    new RegExp(`(?:cliente:?)[ \\t]+${NOMBRE_2_4}`, 'i'),
   ]
 
   for (const patron of patronesNombre) {
@@ -126,7 +131,8 @@ function extraerProducto(texto: string, productos: Producto[]): { id: string; no
     let matches = 0
 
     for (const palabra of palabras) {
-      if (palabra.length >= 2 && textoLower.includes(palabra)) {
+      // Umbral de 3 chars para evitar falsos positivos como "de" → "deportivos".
+      if (palabra.length >= 3 && textoLower.includes(palabra)) {
         score += palabra.length
         matches++
       }

@@ -14,6 +14,9 @@
     "build:frontend": "npm run build -w frontend",
     "build": "npm run build:backend && npm run build:frontend",
     "start:backend": "npm run start:prod -w backend",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "test": "npm test -w backend && npm test -w frontend",
+    "test:backend": "npm test -w backend",
+    "test:frontend": "npm test -w frontend"
   }
 }
