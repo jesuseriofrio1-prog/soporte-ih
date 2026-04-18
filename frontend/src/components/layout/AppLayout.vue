@@ -80,7 +80,6 @@ const navItems = computed(() => [
   },
   { name: 'Catálogo', route: '/catalogo', icon: 'pi pi-box', badge: 0 },
   { name: 'Clientes', route: '/clientes', icon: 'pi pi-users', badge: 0 },
-  { name: 'Integraciones', route: '/integraciones', icon: 'pi pi-sync', badge: 0 },
 ])
 
 const sidebarOpen = ref(false)
