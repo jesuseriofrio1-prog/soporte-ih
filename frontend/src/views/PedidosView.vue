@@ -292,13 +292,10 @@ function matchesAntiguedad(p: Pedido, filtro: AntiguedadKey): boolean {
 const chipsAntiguedad = computed(() => {
   const countFor = (k: AntiguedadKey) => pedidosStore.pedidos.filter((p) => matchesAntiguedad(p, k)).length
   return [
-    { key: 'todos' as const,     label: 'Todos',          count: pedidosStore.pedidos.length,  alerta: false },
-    { key: 'novedades' as const, label: 'Novedades',      count: countFor('novedades'),        alerta: true },
-    { key: 'hoy' as const,       label: 'Nuevos hoy',     count: countFor('hoy'),              alerta: false },
-    { key: '1d' as const,        label: 'Pendientes 1d',  count: countFor('1d'),               alerta: false },
-    { key: '2d' as const,        label: 'Pendientes 2d',  count: countFor('2d'),               alerta: false },
-    { key: '3plus' as const,     label: 'Pendientes +3d', count: countFor('3plus'),            alerta: false },
-    { key: 'aplazados' as const, label: 'Aplazados',      count: countFor('aplazados'),        alerta: false },
+    { key: 'todos' as const,     label: 'Todos',      count: pedidosStore.pedidos.length, alerta: false },
+    { key: 'novedades' as const, label: 'Novedades',  count: countFor('novedades'),       alerta: true },
+    { key: 'hoy' as const,       label: 'Nuevos hoy', count: countFor('hoy'),             alerta: false },
+    { key: 'aplazados' as const, label: 'Aplazados',  count: countFor('aplazados'),       alerta: false },
   ]
 })
 
