@@ -29,6 +29,7 @@ export interface Pedido {
   canal_origen: string | null
   notas: string | null
   provincia: string | null
+  tracking_code?: string
   retencion_inicio: string | null
   created_at: string
   updated_at: string

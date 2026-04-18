@@ -19,6 +19,8 @@ const props = defineProps<{
   direccion?: string
   /** Monto del pedido, si está disponible para variables {monto}. */
   monto?: number
+  /** Código corto para armar {link_tracking}. */
+  trackingCode?: string
 }>()
 
 const emit = defineEmits<{
@@ -65,6 +67,9 @@ const variables = computed(() => ({
   agencia: props.direccion || 'tu ciudad',
   direccion: props.direccion || '',
   monto: props.monto !== undefined ? `$${props.monto.toFixed(2)}` : '',
+  link_tracking: props.trackingCode
+    ? `${window.location.origin}/t/${props.trackingCode}`
+    : '',
 }))
 
 // Seleccionar plantilla sugerida cuando el modal se abre

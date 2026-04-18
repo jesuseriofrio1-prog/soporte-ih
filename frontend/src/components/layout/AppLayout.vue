@@ -114,6 +114,7 @@ const navItems = computed(() => [
   { name: 'Catálogo',     route: '/catalogo',     badge: 0, section: 'main' },
   { name: 'Clientes',     route: '/clientes',     badge: 0, section: 'main' },
   { name: 'Solicitudes',  route: '/solicitudes',  badge: solicitudesAbiertas.value, section: 'main' },
+  { name: 'Upsell',       route: '/upsell',       badge: 0, section: 'main' },
   { name: 'Plantillas',   route: '/plantillas',   badge: 0, section: 'admin' },
   { name: 'Tiendas',      route: '/tiendas',      badge: 0, section: 'admin' },
   { name: 'Integraciones',route: '/integraciones',badge: 0, section: 'admin' },
@@ -218,6 +219,7 @@ const storagePorcentaje = computed(() => storage.value?.usage_percent ?? 0)
           <svg v-else-if="item.name === 'Catálogo'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="9" y="9" width="5" height="5" rx="0.5"/></svg>
           <svg v-else-if="item.name === 'Clientes'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke-linecap="round"/></svg>
           <svg v-else-if="item.name === 'Solicitudes'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v10H3z"/><path d="M6 7h4M6 10h4" stroke-linecap="round"/></svg>
+          <svg v-else-if="item.name === 'Upsell'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12l4-4 3 3 4-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 6h3v3" stroke-linecap="round"/></svg>
           <span class="flex-1">{{ item.name }}</span>
           <span
             v-if="item.badge > 0"

@@ -18,6 +18,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { SolicitudesModule } from './solicitudes/solicitudes.module';
 import { TemplatesModule } from './templates/templates.module';
 import { DireccionesModule } from './direcciones/direcciones.module';
+import { TrackingPublicoModule } from './tracking-publico/tracking-publico.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { DireccionesModule } from './direcciones/direcciones.module';
     SolicitudesModule,
     TemplatesModule,
     DireccionesModule,
+    TrackingPublicoModule,
   ],
   controllers: [AppController],
   providers: [

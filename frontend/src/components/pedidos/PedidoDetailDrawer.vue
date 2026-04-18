@@ -9,6 +9,14 @@ import {
   retencionColor,
   formatFechaLarga,
 } from '../../composables/usePedidoEstado'
+import {
+  calcularStatsProvincia,
+  calcularStatsCliente,
+  calcularRiesgo,
+  NIVEL_PILL,
+  NIVEL_DOT,
+} from '../../composables/usePedidoRiesgo'
+import { usePedidosStore } from '../../stores/pedidos'
 
 const props = defineProps<{
   visible: boolean
@@ -64,6 +72,16 @@ function guardar() {
   emit('editar', { ...editForm.value })
 }
 
+async function copiarLinkTracking() {
+  if (!props.pedido?.tracking_code) return
+  const url = `${window.location.origin}/t/${props.pedido.tracking_code}`
+  try {
+    await navigator.clipboard.writeText(url)
+  } catch {
+    // silencioso
+  }
+}
+
 watch(() => props.pedido?.id, () => {
   editando.value = false
   accionesAvanzadasAbiertas.value = false
@@ -105,6 +123,21 @@ const historialOrdenado = computed(() => {
   const list = [...(props.pedido?.historial || [])]
   return list.sort((a, b) => b.created_at.localeCompare(a.created_at))
 })
+
+// Riesgo pre-envío (calculado sobre todos los pedidos cargados)
+const pedidosStore = usePedidosStore()
+const statsProvincia = computed(() => calcularStatsProvincia(pedidosStore.pedidos))
+const statsCliente = computed(() => calcularStatsCliente(pedidosStore.pedidos))
+const riesgo = computed(() =>
+  props.pedido ? calcularRiesgo(props.pedido, statsProvincia.value, statsCliente.value) : null,
+)
+
+// El riesgo sólo aplica mientras el pedido está "accionable"
+const riesgoAccionable = computed(() =>
+  props.pedido
+    ? ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'NOVEDAD'].includes(props.pedido.estado)
+    : false,
+)
 </script>
 
 <template>
@@ -252,6 +285,48 @@ const historialOrdenado = computed(() => {
           </button>
         </div>
 
+        <!-- Análisis de riesgo pre-envío -->
+        <div v-if="!editando && riesgo && riesgoAccionable" class="mb-7">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold">
+              Análisis de riesgo
+            </div>
+            <span
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium"
+              :class="NIVEL_PILL[riesgo.nivel]"
+            >
+              <span class="state-dot" :class="NIVEL_DOT[riesgo.nivel]"></span>
+              {{ riesgo.nivel.charAt(0).toUpperCase() + riesgo.nivel.slice(1) }} · {{ riesgo.score }}/100
+            </span>
+          </div>
+          <div
+            v-if="riesgo.factores.length > 0"
+            class="surface rounded-md p-3 space-y-1.5"
+          >
+            <div
+              v-for="(f, i) in riesgo.factores"
+              :key="i"
+              class="flex items-start gap-2 text-[12px]"
+            >
+              <span
+                class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono tabular shrink-0"
+                :style="f.impacto > 0
+                  ? { background: 'var(--rose-bg)', color: 'var(--rose-fg)' }
+                  : { background: 'var(--emerald-bg)', color: 'var(--emerald-fg)' }"
+              >
+                {{ f.impacto > 0 ? '+' : '' }}{{ f.impacto }}
+              </span>
+              <div class="flex-1">
+                <div class="font-medium">{{ f.nombre }}</div>
+                <div class="text-ink-muted">{{ f.razon }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-[12px] text-ink-faint">
+            Sin factores destacados. Pedido listo para enviar.
+          </div>
+        </div>
+
         <!-- Historial (timeline vertical) -->
         <div v-if="!editando" class="mb-7">
           <div class="text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold mb-4">Historial</div>
@@ -300,6 +375,23 @@ const historialOrdenado = computed(() => {
 
         <!-- Detalles metadata -->
         <dl v-if="!editando" class="grid grid-cols-2 gap-y-3 gap-x-6 text-[12px] mb-6">
+          <div v-if="pedido.tracking_code" class="col-span-2">
+            <dt class="text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1">
+              Link público de tracking
+            </dt>
+            <dd class="flex items-center gap-2">
+              <code class="font-mono tabular text-[11px] flex-1 truncate">
+                /t/{{ pedido.tracking_code }}
+              </code>
+              <button
+                @click="copiarLinkTracking"
+                class="h-7 px-2 rounded border hairline text-[10px] font-medium hover:bg-paper-alt"
+                title="Copiar URL completa"
+              >
+                Copiar link
+              </button>
+            </dd>
+          </div>
           <div>
             <dt class="text-[10px] uppercase tracking-wider text-ink-faint font-semibold mb-1">Guía</dt>
             <dd class="font-mono tabular break-all">{{ pedido.guia }}</dd>

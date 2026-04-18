@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import type { EstadoPedido, Pedido } from '../../services/pedidosService'
+import { computed } from 'vue'
 import {
   ESTADO_LABELS,
   filaAlerta,
   formatFecha,
 } from '../../composables/usePedidoEstado'
+import {
+  calcularStatsProvincia,
+  calcularStatsCliente,
+  calcularRiesgo,
+  NIVEL_PILL,
+  NIVEL_DOT,
+} from '../../composables/usePedidoRiesgo'
 
 /**
  * Tabla de pedidos con look minimal estilo rediseño v2:
@@ -93,6 +101,14 @@ function inicialesProducto(nombre: string | undefined): string {
   if (!nombre) return '??'
   const words = nombre.trim().split(/\s+/).slice(0, 2)
   return words.map((w) => w[0]).join('').toUpperCase()
+}
+
+// Stats pre-calculadas una sola vez por render de la tabla.
+const statsProvincia = computed(() => calcularStatsProvincia(props.pedidos))
+const statsCliente = computed(() => calcularStatsCliente(props.pedidos))
+
+function riesgoDe(p: Pedido) {
+  return calcularRiesgo(p, statsProvincia.value, statsCliente.value)
 }
 </script>
 
@@ -216,7 +232,7 @@ function inicialesProducto(nombre: string | undefined): string {
             </div>
           </td>
 
-          <!-- Estado -->
+          <!-- Estado + riesgo pre-envío -->
           <td class="py-3 px-2" @click.stop>
             <span
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium"
@@ -225,8 +241,20 @@ function inicialesProducto(nombre: string | undefined): string {
               <span class="state-dot" :class="ESTADO_DOT[pedido.estado] || 'dot-blue'"></span>
               {{ ESTADO_LABELS[pedido.estado] || pedido.estado }}
             </span>
-            <!-- Tipo entrega como hint secundario -->
-            <div class="text-[10px] text-ink-faint mt-1">{{ pedido.tipo_entrega }}</div>
+            <!-- Pill de riesgo sólo para pedidos "activos" (aún podés accionar) -->
+            <template v-if="['PENDIENTE','CONFIRMADO','EN_PREPARACION','NOVEDAD'].includes(pedido.estado)">
+              <div class="mt-1 flex items-center gap-1">
+                <span
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                  :class="NIVEL_PILL[riesgoDe(pedido).nivel]"
+                  :title="riesgoDe(pedido).factores.map((f) => f.razon).join(' · ') || 'Sin factores destacados'"
+                >
+                  <span class="state-dot" :class="NIVEL_DOT[riesgoDe(pedido).nivel]"></span>
+                  Riesgo {{ riesgoDe(pedido).nivel }} · {{ riesgoDe(pedido).score }}
+                </span>
+              </div>
+            </template>
+            <div v-else class="text-[10px] text-ink-faint mt-1">{{ pedido.tipo_entrega }}</div>
           </td>
 
           <!-- Monto -->

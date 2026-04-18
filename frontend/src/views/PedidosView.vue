@@ -117,6 +117,9 @@ async function bulkAbrirWhatsApp() {
       agencia: p.direccion || '',
       direccion: p.direccion || '',
       monto: `$${Number(p.monto).toFixed(2)}`,
+      link_tracking: p.tracking_code
+        ? `${window.location.origin}/t/${p.tracking_code}`
+        : '',
     })
     abrirWhatsApp(tel, mensaje)
   }
@@ -406,6 +409,7 @@ onMounted(() => {
       :estado="waPedido.estado"
       :direccion="waPedido.direccion"
       :monto="Number(waPedido.monto)"
+      :tracking-code="waPedido.tracking_code"
     />
   </div>
 </template>

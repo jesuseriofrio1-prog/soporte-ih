@@ -15,6 +15,13 @@ const routes = [
     component: () => import('../views/PublicSolicitudView.vue'),
     meta: { public: true },
   },
+  // Tracking público con marca — el link que compartimos al cliente final
+  {
+    path: '/t/:code',
+    name: 'public-tracking',
+    component: () => import('../views/PublicTrackingView.vue'),
+    meta: { public: true },
+  },
   {
     path: '/',
     redirect: '/dashboard',
@@ -67,6 +74,12 @@ const routes = [
         meta: { title: 'Plantillas WhatsApp' },
       },
       {
+        path: 'upsell',
+        name: 'upsell',
+        component: () => import('../views/UpsellView.vue'),
+        meta: { title: 'Oportunidades de upsell' },
+      },
+      {
         path: 'solicitudes',
         name: 'solicitudes',
         component: () => import('../views/SolicitudesView.vue'),
@@ -93,8 +106,10 @@ const router = createRouter({
  *  - Rutas privadas: si no hay sesión, a /login con ?redirect=.
  */
 router.beforeEach(async (to) => {
-  const isPublicForm = to.name === 'public-solicitud'
-  if (isPublicForm) return // no tocamos auth
+  // Rutas de cliente final (form público + tracking público): no
+  // tocamos auth. El navegador del cliente nunca pide /auth/me.
+  const isPublicClient = to.name === 'public-solicitud' || to.name === 'public-tracking'
+  if (isPublicClient) return
 
   const { useAuthStore } = await import('../stores/auth')
   const auth = useAuthStore()
