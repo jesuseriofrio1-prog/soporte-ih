@@ -61,6 +61,12 @@ const routes = [
         meta: { title: 'Integraciones' },
       },
       {
+        path: 'plantillas',
+        name: 'plantillas',
+        component: () => import('../views/PlantillasView.vue'),
+        meta: { title: 'Plantillas WhatsApp' },
+      },
+      {
         path: 'solicitudes',
         name: 'solicitudes',
         component: () => import('../views/SolicitudesView.vue'),

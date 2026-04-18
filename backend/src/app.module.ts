@@ -16,6 +16,8 @@ import { TrackingModule } from './tracking/tracking.module';
 import { ImportsModule } from './imports/imports.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { SolicitudesModule } from './solicitudes/solicitudes.module';
+import { TemplatesModule } from './templates/templates.module';
+import { DireccionesModule } from './direcciones/direcciones.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { SolicitudesModule } from './solicitudes/solicitudes.module';
     ImportsModule,
     WebhooksModule,
     SolicitudesModule,
+    TemplatesModule,
+    DireccionesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -13,12 +13,14 @@ import {
  *  - Acciones WA/eliminar aparecen en hover (row-actions).
  */
 
-defineProps<{
+const props = defineProps<{
   pedidos: Pedido[]
   sortKey: string
   loading: boolean
   empty: boolean
   sortLabel: (key: string) => string
+  /** IDs de pedidos seleccionados (v-model desde el padre). */
+  seleccionados?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -28,7 +30,32 @@ const emit = defineEmits<{
   'toggle-retencion': [p: Pedido]
   'abrir-wa': [p: Pedido]
   'abrir-tracking': [guia: string]
+  'update:seleccionados': [ids: string[]]
 }>()
+
+/** Toggle individual de un pedido. */
+function toggleSeleccion(id: string, checked: boolean) {
+  const actual = props.seleccionados ?? []
+  const nuevos = checked
+    ? Array.from(new Set([...actual, id]))
+    : actual.filter((x) => x !== id)
+  emit('update:seleccionados', nuevos)
+}
+
+/** Toggle del header: selecciona todos los visibles o limpia. */
+function toggleTodos(checked: boolean) {
+  emit(
+    'update:seleccionados',
+    checked ? props.pedidos.map((p) => p.id) : [],
+  )
+}
+
+/** True si todos los visibles están seleccionados. */
+function todosMarcados(): boolean {
+  if (props.pedidos.length === 0) return false
+  const set = new Set(props.seleccionados ?? [])
+  return props.pedidos.every((p) => set.has(p.id))
+}
 
 // Mapeo de estado → clase pill para el badge inline.
 const ESTADO_PILL: Record<string, string> = {
@@ -86,7 +113,17 @@ function inicialesProducto(nombre: string | undefined): string {
           class="border-b hairline text-[10px] uppercase tracking-[0.1em] text-ink-faint font-semibold"
           style="background: var(--paper-alt);"
         >
-          <th class="py-2.5 pl-5 pr-2 text-left cursor-pointer hover:text-ink transition" @click="emit('sort', 'cliente')">
+          <th class="py-2.5 pl-5 pr-2 text-left w-7">
+            <input
+              type="checkbox"
+              :checked="todosMarcados()"
+              @change="toggleTodos(($event.target as HTMLInputElement).checked)"
+              @click.stop
+              class="rounded cursor-pointer"
+              aria-label="Seleccionar todos los pedidos visibles"
+            />
+          </th>
+          <th class="py-2.5 px-2 text-left cursor-pointer hover:text-ink transition" @click="emit('sort', 'cliente')">
             <span class="flex items-center gap-1">
               Cliente / Fecha
               <span class="text-base" :class="sortKey === 'fecha' ? 'opacity-100' : 'opacity-30'">
@@ -123,8 +160,19 @@ function inicialesProducto(nombre: string | undefined): string {
           :class="filaAlerta(pedido.estado, pedido.dias_en_agencia) ? 'surface-amber hover:opacity-90' : 'hover:bg-paper-alt'"
           @click="emit('abrir-detalle', pedido)"
         >
+          <!-- Checkbox -->
+          <td class="py-3 pl-5 pr-2" @click.stop>
+            <input
+              type="checkbox"
+              :checked="(seleccionados ?? []).includes(pedido.id)"
+              @change="toggleSeleccion(pedido.id, ($event.target as HTMLInputElement).checked)"
+              class="rounded cursor-pointer"
+              :aria-label="`Seleccionar pedido ${pedido.guia}`"
+            />
+          </td>
+
           <!-- Cliente + fecha + guía -->
-          <td class="py-3 pl-5 pr-2">
+          <td class="py-3 px-2">
             <div class="font-medium">
               {{ pedido.cliente_nombre || pedido.clientes?.nombre || '—' }}
             </div>

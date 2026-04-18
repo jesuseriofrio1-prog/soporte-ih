@@ -114,6 +114,7 @@ const navItems = computed(() => [
   { name: 'Catálogo',     route: '/catalogo',     badge: 0, section: 'main' },
   { name: 'Clientes',     route: '/clientes',     badge: 0, section: 'main' },
   { name: 'Solicitudes',  route: '/solicitudes',  badge: solicitudesAbiertas.value, section: 'main' },
+  { name: 'Plantillas',   route: '/plantillas',   badge: 0, section: 'admin' },
   { name: 'Tiendas',      route: '/tiendas',      badge: 0, section: 'admin' },
   { name: 'Integraciones',route: '/integraciones',badge: 0, section: 'admin' },
 ])
@@ -239,6 +240,7 @@ const storagePorcentaje = computed(() => storage.value?.usage_percent ?? 0)
           :class="{ active: isActive(item.route) }"
         >
           <svg v-if="item.name === 'Tiendas'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6l2-3h8l2 3v7H2V6z"/><path d="M6 13V9h4v4" stroke-linecap="round"/></svg>
+          <svg v-else-if="item.name === 'Plantillas'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 3h8v10H4z"/><path d="M6 6h4M6 9h4M6 11h2" stroke-linecap="round"/></svg>
           <svg v-else-if="item.name === 'Integraciones'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 2v3M8 11v3M2 8h3M11 8h3" stroke-linecap="round"/></svg>
           <span>{{ item.name }}</span>
         </a>

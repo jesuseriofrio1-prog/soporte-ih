@@ -1,17 +1,13 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import Dialog from 'primevue/dialog'
-import {
-  generarMensaje,
-  abrirWhatsApp,
-  sugerirPlantilla,
-  PLANTILLA_LABELS,
-  type PlantillaWA,
-  type DatosPlantilla,
-} from '../../composables/useWhatsApp'
+import { abrirWhatsApp } from '../../composables/useWhatsApp'
 import { useTiendaStore } from '../../stores/tienda'
+import { useTemplatesStore } from '../../stores/templates'
+import { renderTemplate } from '../../services/templatesService'
 
 const tiendaStore = useTiendaStore()
+const templatesStore = useTemplatesStore()
 
 const props = defineProps<{
   visible: boolean
@@ -21,6 +17,8 @@ const props = defineProps<{
   guia: string
   estado: string
   direccion?: string
+  /** Monto del pedido, si está disponible para variables {monto}. */
+  monto?: number
 }>()
 
 const emit = defineEmits<{
@@ -32,41 +30,73 @@ const dialogVisible = computed({
   set: (val) => emit('update:visible', val),
 })
 
-const plantillaSeleccionada = ref<PlantillaWA>('NUEVO')
+const templateIdSeleccionado = ref<string | null>(null)
 const mensajeTexto = ref('')
 
-const plantillasOpciones = Object.entries(PLANTILLA_LABELS) as [PlantillaWA, string][]
+/**
+ * Mapea estado → slug de plantilla sugerida. Si no hay match exacto,
+ * cae a la primera plantilla activa.
+ */
+function slugSugeridoPorEstado(estado: string): string | null {
+  switch (estado) {
+    case 'PENDIENTE':
+    case 'CONFIRMADO':
+    case 'EN_PREPARACION':
+    case 'ENVIADO':
+      return 'envio-nuevo'
+    case 'EN_RUTA':
+      return 'reparto-hoy'
+    case 'RETIRO_EN_AGENCIA':
+      return 'llego-agencia'
+    case 'NOVEDAD':
+    case 'NO_ENTREGADO':
+      return 'novedad-direccion'
+    default:
+      return 'libre'
+  }
+}
 
-// Datos para la plantilla
-const datos = computed<DatosPlantilla>(() => ({
+// Datos para reemplazo de variables
+const variables = computed(() => ({
   nombre: props.nombre,
   producto: props.producto,
   guia: props.guia,
   tienda: tiendaStore.tiendaActiva?.nombre || 'nuestra tienda',
   agencia: props.direccion || 'tu ciudad',
+  direccion: props.direccion || '',
+  monto: props.monto !== undefined ? `$${props.monto.toFixed(2)}` : '',
 }))
 
-// Cuando se abre el modal, auto-seleccionar plantilla según estado
-watch(() => props.visible, (val) => {
-  if (val) {
-    plantillaSeleccionada.value = sugerirPlantilla(props.estado)
-    regenerarMensaje()
+// Seleccionar plantilla sugerida cuando el modal se abre
+watch(() => props.visible, async (val) => {
+  if (!val) return
+  if (templatesStore.templates.length === 0) {
+    await templatesStore.fetchTemplates()
   }
-})
-
-// Cuando cambia la plantilla, regenerar mensaje
-watch(plantillaSeleccionada, () => {
+  const slug = slugSugeridoPorEstado(props.estado)
+  const sugerida = slug ? templatesStore.porSlug(slug) : null
+  const fallback = templatesStore.activos[0] ?? null
+  const elegida = sugerida ?? fallback
+  templateIdSeleccionado.value = elegida?.id ?? null
   regenerarMensaje()
 })
 
+watch(templateIdSeleccionado, () => regenerarMensaje())
+
 function regenerarMensaje() {
-  mensajeTexto.value = generarMensaje(plantillaSeleccionada.value, datos.value)
+  const tpl = templatesStore.templates.find((t) => t.id === templateIdSeleccionado.value)
+  if (!tpl) { mensajeTexto.value = ''; return }
+  mensajeTexto.value = renderTemplate(tpl.mensaje, variables.value)
 }
 
 function enviar() {
   abrirWhatsApp(props.telefono, mensajeTexto.value)
   dialogVisible.value = false
 }
+
+onMounted(() => {
+  if (templatesStore.templates.length === 0) templatesStore.fetchTemplates()
+})
 
 /** Estilo del badge de estado en el resumen */
 const estadoEstilos: Record<string, string> = {
@@ -114,11 +144,18 @@ const estadoEstilos: Record<string, string> = {
         Plantilla de mensaje
       </label>
       <select
-        v-model="plantillaSeleccionada"
+        v-model="templateIdSeleccionado"
         class="w-full px-3 py-2 border hairline rounded-md bg-paper-alt text-[13px] text-ink focus:outline-none focus:border-accent transition"
       >
-        <option v-for="[key, label] in plantillasOpciones" :key="key" :value="key">
-          {{ label }}
+        <option v-if="templatesStore.activos.length === 0" :value="null" disabled>
+          No hay plantillas activas — creá una en /plantillas
+        </option>
+        <option
+          v-for="tpl in templatesStore.activos"
+          :key="tpl.id"
+          :value="tpl.id"
+        >
+          {{ tpl.nombre }}
         </option>
       </select>
     </div>

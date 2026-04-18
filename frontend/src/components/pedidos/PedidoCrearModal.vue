@@ -5,6 +5,7 @@ import { useToast } from 'vue-toastification'
 import type { Producto } from '../../services/productosService'
 import type { CreatePedidoPayload } from '../../services/pedidosService'
 import { extraerDatosPedido, contarCamposExtraidos } from '../../composables/useTextExtractor'
+import direccionesService, { type DireccionParseada } from '../../services/direccionesService'
 
 /**
  * Modal de creación de pedido. Incluye extracción automática a partir
@@ -29,6 +30,24 @@ const emit = defineEmits<{
 const toast = useToast()
 
 const mensajeWA = ref('')
+const verificandoDireccion = ref(false)
+const analisisDireccion = ref<DireccionParseada | null>(null)
+
+async function verificarDireccion() {
+  if (!form.value.direccion.trim()) {
+    toast.warning('Escribe una dirección primero')
+    return
+  }
+  verificandoDireccion.value = true
+  try {
+    analisisDireccion.value = await direccionesService.parse(form.value.direccion)
+  } catch {
+    toast.error('No se pudo analizar la dirección')
+    analisisDireccion.value = null
+  } finally {
+    verificandoDireccion.value = false
+  }
+}
 const form = ref({
   cliente_nombre: '',
   cliente_telefono: '',
@@ -56,7 +75,10 @@ function resetForm() {
 
 // Reset cada vez que el modal se abre, para no arrastrar datos previos.
 watch(() => props.visible, (v) => {
-  if (v) resetForm()
+  if (v) {
+    resetForm()
+    analisisDireccion.value = null
+  }
 })
 
 function procesarMensajeWA() {
@@ -204,12 +226,54 @@ function guardar() {
       </div>
 
       <div>
-        <label class="block text-sm font-bold text-navy mb-1">
-          {{ form.tipo_entrega === 'AGENCIA' ? 'Agencia destino' : 'Dirección' }} *
-        </label>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-sm font-bold text-navy">
+            {{ form.tipo_entrega === 'AGENCIA' ? 'Agencia destino' : 'Dirección' }} *
+          </label>
+          <button
+            v-if="form.tipo_entrega === 'DOMICILIO'"
+            type="button"
+            @click="verificarDireccion"
+            :disabled="verificandoDireccion || !form.direccion.trim()"
+            class="text-[11px] font-medium hover:underline disabled:opacity-40"
+            style="color: var(--accent);"
+            title="Analiza la dirección con IA antes de enviar a Rocket"
+          >
+            {{ verificandoDireccion ? 'Analizando…' : '✨ Verificar con IA' }}
+          </button>
+        </div>
         <input v-model="form.direccion" type="text"
           :placeholder="form.tipo_entrega === 'AGENCIA' ? 'Agencia Guayaquil Norte' : 'Av. Principal 123, Quito'"
           class="w-full px-4 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy focus:outline-none focus:border-mauve transition" />
+
+        <!-- Análisis de dirección -->
+        <div
+          v-if="analisisDireccion"
+          class="mt-2 p-3 rounded-md text-[12px]"
+          :class="analisisDireccion.completa ? 'pill-emerald' : 'pill-amber'"
+        >
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-semibold">
+              {{ analisisDireccion.completa ? '✓ Dirección completa' : '⚠ Dirección incompleta' }}
+            </span>
+            <button
+              type="button"
+              @click="analisisDireccion = null"
+              class="opacity-60 hover:opacity-100"
+              aria-label="Cerrar análisis"
+            >×</button>
+          </div>
+          <div v-if="analisisDireccion.provincia || analisisDireccion.canton" class="flex flex-wrap gap-2 mb-1">
+            <span v-if="analisisDireccion.provincia" class="font-mono text-[11px]">
+              {{ analisisDireccion.provincia }}
+            </span>
+            <span v-if="analisisDireccion.canton" class="font-mono text-[11px]">· {{ analisisDireccion.canton }}</span>
+            <span v-if="analisisDireccion.sector" class="font-mono text-[11px]">· {{ analisisDireccion.sector }}</span>
+          </div>
+          <ul v-if="analisisDireccion.problemas.length > 0" class="list-disc pl-4 space-y-0.5">
+            <li v-for="(p, i) in analisisDireccion.problemas" :key="i">{{ p }}</li>
+          </ul>
+        </div>
       </div>
 
       <div>

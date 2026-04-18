@@ -8,6 +8,10 @@ import PedidosFiltersBar from '../components/pedidos/PedidosFiltersBar.vue'
 import PedidosTable from '../components/pedidos/PedidosTable.vue'
 import PedidoDetailDrawer from '../components/pedidos/PedidoDetailDrawer.vue'
 import PedidoCrearModal from '../components/pedidos/PedidoCrearModal.vue'
+import PedidosBulkBar from '../components/pedidos/PedidosBulkBar.vue'
+import { abrirWhatsApp } from '../composables/useWhatsApp'
+import { useTemplatesStore } from '../stores/templates'
+import { renderTemplate } from '../services/templatesService'
 import { usePedidosStore } from '../stores/pedidos'
 import { useProductosStore } from '../stores/productos'
 import { useTiendaStore } from '../stores/tienda'
@@ -22,6 +26,102 @@ const toast = useToast()
 const pedidosStore = usePedidosStore()
 const productosStore = useProductosStore()
 const tiendaStore = useTiendaStore()
+const templatesStore = useTemplatesStore()
+
+// ──────────────── Bulk selection ────────────────
+const seleccionados = ref<string[]>([])
+
+const pedidosSeleccionados = computed(() =>
+  pedidosStore.pedidos.filter((p) => seleccionados.value.includes(p.id)),
+)
+
+async function bulkCambiarEstado(nuevo: EstadoPedido) {
+  const ids = [...seleccionados.value]
+  if (ids.length === 0) return
+  if (!confirm(`Cambiar ${ids.length} pedido(s) a "${nuevo.replace(/_/g, ' ')}"?`)) return
+
+  let ok = 0
+  let fail = 0
+  for (const id of ids) {
+    try {
+      await pedidosStore.actualizarEstado(id, nuevo)
+      ok++
+    } catch {
+      fail++
+    }
+  }
+  toast[fail === 0 ? 'success' : 'warning'](
+    `${ok} actualizado(s)${fail > 0 ? ` · ${fail} fallido(s)` : ''}`,
+  )
+  seleccionados.value = []
+  pedidosStore.fetchPedidos()
+}
+
+function bulkExportarCsv() {
+  const filas = pedidosSeleccionados.value
+  if (filas.length === 0) return
+
+  const header = ['guia','cliente','telefono','producto','estado','monto','provincia','ciudad','direccion','fecha']
+  const rows = filas.map((p) => [
+    p.guia,
+    p.cliente_nombre || p.clientes?.nombre || '',
+    p.cliente_telefono || p.clientes?.telefono || '',
+    p.productos?.nombre || '',
+    p.estado,
+    Number(p.monto).toFixed(2),
+    p.provincia || '',
+    p.clientes?.ciudad || '',
+    p.direccion,
+    p.created_at.slice(0, 10),
+  ])
+
+  // CSV escape: envuelve en "..." y duplica comillas internas
+  const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`
+  const csv = [header, ...rows].map((r) => r.map(esc).join(',')).join('\n')
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `pedidos-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast.success(`Exportados ${filas.length} pedidos`)
+}
+
+async function bulkAbrirWhatsApp() {
+  const filas = pedidosSeleccionados.value
+  if (filas.length === 0) return
+
+  // Aseguramos templates cargados
+  if (templatesStore.templates.length === 0) await templatesStore.fetchTemplates()
+  // Elegimos la plantilla "libre" como base; fallback a la primera activa
+  const tpl = templatesStore.porSlug('libre') ?? templatesStore.activos[0]
+  if (!tpl) {
+    toast.warning('No hay plantillas activas. Creá una en /plantillas.')
+    return
+  }
+
+  if (!confirm(`Abrir ${filas.length} conversaciones de WhatsApp en nuevas pestañas?`)) return
+
+  for (const p of filas) {
+    const tel = p.cliente_telefono || p.clientes?.telefono || ''
+    if (!tel) continue
+    const mensaje = renderTemplate(tpl.mensaje, {
+      nombre: p.cliente_nombre || p.clientes?.nombre || '',
+      producto: p.productos?.nombre || '',
+      guia: p.guia,
+      tienda: tiendaStore.tiendaActiva?.nombre || 'nuestra tienda',
+      agencia: p.direccion || '',
+      direccion: p.direccion || '',
+      monto: `$${Number(p.monto).toFixed(2)}`,
+    })
+    abrirWhatsApp(tel, mensaje)
+  }
+  toast.success(`${filas.length} tabs de WhatsApp abiertos`)
+}
 
 // ──────────────── Filtros, chips y ordenamiento ────────────────
 const pedidos = computed(() => pedidosStore.pedidos)
@@ -260,12 +360,21 @@ onMounted(() => {
       :sort-label="sortLabel"
       :loading="pedidosStore.loading"
       :empty="pedidosStore.pedidos.length === 0"
+      v-model:seleccionados="seleccionados"
       @sort="toggleSort"
       @abrir-detalle="abrirDetalle"
       @cambiar-estado="onCambiarEstado"
       @toggle-retencion="toggleRetencion"
       @abrir-wa="abrirWAModal"
       @abrir-tracking="abrirTracking"
+    />
+
+    <PedidosBulkBar
+      :seleccionados="pedidosSeleccionados"
+      @cambiar-estado="bulkCambiarEstado"
+      @exportar-csv="bulkExportarCsv"
+      @abrir-todos-wa="bulkAbrirWhatsApp"
+      @limpiar="seleccionados = []"
     />
 
     <PedidoDetailDrawer
@@ -296,6 +405,7 @@ onMounted(() => {
       :guia="waPedido.guia"
       :estado="waPedido.estado"
       :direccion="waPedido.direccion"
+      :monto="Number(waPedido.monto)"
     />
   </div>
 </template>
