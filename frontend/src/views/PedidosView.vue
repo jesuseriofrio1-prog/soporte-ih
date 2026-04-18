@@ -832,6 +832,9 @@ onMounted(() => {
               <div class="col-span-2">
                 <p class="text-xs text-navy/50 font-bold">Dirección</p>
                 <p class="text-navy font-medium">{{ pedidoDetalle.direccion }}</p>
+                <p v-if="pedidoDetalle.provincia" class="text-xs text-navy/50 mt-0.5">
+                  <i class="pi pi-map-marker mr-1" aria-hidden="true"></i>{{ pedidoDetalle.provincia }}
+                </p>
               </div>
               <div v-if="pedidoDetalle.dias_en_agencia > 0" class="col-span-2">
                 <p class="text-xs text-navy/50 font-bold">Días en agencia</p>

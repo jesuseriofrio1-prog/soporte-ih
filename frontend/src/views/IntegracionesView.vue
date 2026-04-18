@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { useToast } from 'vue-toastification'
-import importsService, { type ImportResult, type ProductoAlias } from '../services/importsService'
+import importsService, {
+  type ImportResult,
+  type ProductoAlias,
+  type WebhookLog,
+} from '../services/importsService'
 import { useTiendaStore } from '../stores/tienda'
 import { useProductosStore } from '../stores/productos'
 
@@ -17,11 +21,36 @@ const lastResult = ref<ImportResult | null>(null)
 const aliases = ref<ProductoAlias[]>([])
 const aliasesLoading = ref(false)
 
+const webhookLogs = ref<WebhookLog[]>([])
+const webhookLogsLoading = ref(false)
+
+// Origen del dominio backend para armar la URL del webhook.
+const webhookOrigin = computed(() => window.location.origin)
+
 // Mapa local de "alias pendientes" no-mapeados tras la última importación,
-// pareados con el producto que el usuario elige del catálogo.
+// pareados con el producto que el usuario elige del catálogo. Si la IA
+// sugirió algo, pre-seleccionamos esa opción para que el usuario sólo
+// confirme con un click.
 const pendientes = ref<
-  { alias_externo: string; id_pedido: string; fila: number; producto_id: string | null }[]
+  {
+    alias_externo: string
+    id_pedido: string
+    fila: number
+    producto_id: string | null
+    sugerencia?: { producto_id: string; producto_nombre: string; confianza: number }
+  }[]
 >([])
+
+async function cargarWebhookLogs() {
+  webhookLogsLoading.value = true
+  try {
+    webhookLogs.value = await importsService.listWebhookLogs(30)
+  } catch {
+    // silencioso
+  } finally {
+    webhookLogsLoading.value = false
+  }
+}
 
 async function cargarAliases() {
   if (!tiendaStore.tiendaActiva) return
@@ -40,6 +69,7 @@ onMounted(async () => {
     await productosStore.fetchProductos(true)
   }
   cargarAliases()
+  cargarWebhookLogs()
 })
 
 watch(
@@ -73,7 +103,11 @@ async function ejecutarImport() {
       selectedFile.value,
     )
     lastResult.value = result
-    pendientes.value = result.sinMapear.map((s) => ({ ...s, producto_id: null }))
+    pendientes.value = result.sinMapear.map((s) => ({
+      ...s,
+      // Si la IA sugirió un producto con suficiente confianza, pre-seleccionamos.
+      producto_id: s.sugerencia?.producto_id ?? null,
+    }))
 
     if (result.creados > 0 || result.actualizados > 0) {
       toast.success(`Importados: ${result.creados} creados, ${result.actualizados} actualizados`)
@@ -205,6 +239,23 @@ const totalProcesado = computed(() => {
         Total procesado: {{ totalProcesado }} &middot; Filas en Excel: {{ lastResult.total + lastResult.saltadosPorEstado }}
       </p>
 
+      <!-- Stats IA -->
+      <div
+        v-if="lastResult.ia && lastResult.ia.llamados > 0"
+        class="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-900 flex flex-wrap gap-4"
+      >
+        <span>
+          <i class="pi pi-sparkles mr-1" aria-hidden="true"></i>
+          <b>Matching por IA</b>
+        </span>
+        <span>Analizados: {{ lastResult.ia.llamados }}</span>
+        <span>Auto-mapeados (≥85%): {{ lastResult.ia.auto_mapeados }}</span>
+        <span>Sugeridos (≥50%): {{ lastResult.ia.sugeridos }}</span>
+        <span v-if="!lastResult.ia.habilitado" class="text-purple-600/70">
+          · IA deshabilitada (falta ANTHROPIC_API_KEY)
+        </span>
+      </div>
+
       <!-- Productos sin mapear: UI para asignar producto local -->
       <div v-if="pendientes.length > 0" class="border-t border-lavanda-medio pt-4">
         <h5 class="text-sm font-bold text-navy mb-2">
@@ -226,6 +277,14 @@ const totalProcesado = computed(() => {
               <div class="text-sm font-bold text-navy">{{ p.alias_externo }}</div>
               <div class="text-xs text-navy/50">
                 Pedido Rocket #{{ p.id_pedido }} · fila {{ p.fila }}
+              </div>
+              <div
+                v-if="p.sugerencia"
+                class="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-800"
+                :title="`Confianza IA: ${p.sugerencia.confianza}%`"
+              >
+                <i class="pi pi-sparkles" aria-hidden="true"></i>
+                IA sugiere: {{ p.sugerencia.producto_nombre }} ({{ p.sugerencia.confianza }}%)
               </div>
             </div>
             <select
@@ -262,6 +321,80 @@ const totalProcesado = computed(() => {
             Fila {{ e.fila }}: {{ e.mensaje }}
           </li>
         </ul>
+      </div>
+    </div>
+
+    <!-- Webhook de Rocket -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-lavanda-medio">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+          <i class="pi pi-bolt text-purple-600 text-xl" aria-hidden="true"></i>
+        </div>
+        <div class="flex-1">
+          <h4 class="text-base font-bold text-navy">Webhook de cambios de estado</h4>
+          <p class="text-sm text-navy/60 mt-1">
+            Rocket puede avisarnos cuando un pedido cambia de estado sin que subas un Excel.
+            Copia la URL debajo y pégala en la configuración de webhooks de Rocket.
+          </p>
+        </div>
+      </div>
+
+      <div class="bg-lavanda/40 border border-lavanda-medio rounded-lg p-3 font-mono text-xs text-navy break-all">
+        {{ webhookOrigin }}/api/webhooks/rocket/&lt;ROCKET_WEBHOOK_SECRET&gt;
+      </div>
+      <p class="text-xs text-navy/50 mt-2">
+        Reemplaza <code>&lt;ROCKET_WEBHOOK_SECRET&gt;</code> por el secreto configurado en las
+        variables de entorno del backend. Solicitudes con secreto inválido se rechazan con 403.
+      </p>
+
+      <!-- Últimos eventos -->
+      <div class="mt-5">
+        <div class="flex items-center justify-between mb-2">
+          <h5 class="text-sm font-bold text-navy">Últimos eventos recibidos</h5>
+          <button
+            @click="cargarWebhookLogs"
+            class="text-xs text-mauve hover:underline"
+            :disabled="webhookLogsLoading"
+          >
+            <i :class="webhookLogsLoading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" aria-hidden="true"></i>
+            Refrescar
+          </button>
+        </div>
+        <div v-if="webhookLogsLoading && webhookLogs.length === 0" class="text-center py-6">
+          <i class="pi pi-spin pi-spinner text-xl text-mauve" aria-hidden="true"></i>
+        </div>
+        <div v-else-if="webhookLogs.length === 0" class="text-sm text-navy/50 text-center py-4">
+          Aún no se ha recibido ningún evento. Configura el webhook en Rocket para empezar.
+        </div>
+        <div v-else class="space-y-1.5 max-h-72 overflow-y-auto">
+          <div
+            v-for="log in webhookLogs"
+            :key="log.id"
+            class="flex flex-wrap items-center gap-2 text-xs p-2 rounded border"
+            :class="{
+              'bg-green-50 border-green-200': log.status === 'ok',
+              'bg-orange-50 border-orange-200': log.status === 'pedido_no_encontrado' || log.status === 'estado_no_reconocido' || log.status === 'ignorado',
+              'bg-red-50 border-red-200': log.status === 'error',
+            }"
+          >
+            <span class="font-mono text-navy/60">
+              {{ new Date(log.created_at).toLocaleString('es-EC') }}
+            </span>
+            <span class="font-bold text-navy">#{{ log.external_order_id ?? '—' }}</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+              :class="{
+                'bg-green-200 text-green-900': log.status === 'ok',
+                'bg-orange-200 text-orange-900': log.status !== 'ok' && log.status !== 'error',
+                'bg-red-200 text-red-900': log.status === 'error',
+              }"
+            >
+              {{ log.status }}
+            </span>
+            <span v-if="log.error_mensaje" class="text-red-700 flex-1 min-w-[200px]">
+              {{ log.error_mensaje }}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
 

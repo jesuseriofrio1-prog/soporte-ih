@@ -2,6 +2,12 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { normalizarTelefono } from '../common/utils';
 import { parseRocketExcel, type ParsedRow } from './rocket-excel.parser';
+import { ProductoMatcherAI } from './producto-matcher';
+
+/** Umbral mínimo para crear alias automáticamente tras match por IA. */
+const AUTO_MATCH_CONFIDENCE = 85;
+/** Umbral mínimo para mostrar una sugerencia al usuario (sin auto-crear). */
+const SUGGEST_CONFIDENCE = 50;
 
 /**
  * Resultado de una importación de Excel de Rocket.
@@ -16,7 +22,19 @@ export interface ImportResult {
     alias_externo: string;
     id_pedido: string;
     fila: number;
+    sugerencia?: {
+      producto_id: string;
+      producto_nombre: string;
+      confianza: number;
+    };
   }[];
+  /** Métricas del matching por IA (si se usó). */
+  ia?: {
+    habilitado: boolean;
+    llamados: number;
+    auto_mapeados: number;
+    sugeridos: number;
+  };
 }
 
 export interface AliasPendiente {
@@ -28,7 +46,10 @@ export interface AliasPendiente {
 export class ImportsService {
   private readonly log = new Logger(ImportsService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly matcherAI: ProductoMatcherAI,
+  ) {}
 
   /**
    * Importa el contenido de un Excel de Rocket. Busca cada producto por
@@ -86,7 +107,76 @@ export class ImportsService {
       }
     }
 
-    // 5) Procesar fila a fila
+    // 5) Primera pasada: resolver productos por match exacto o alias guardado.
+    //    Los nombres no resueltos se juntan (deduplicados) y se pasan a la IA
+    //    en un único request batch.
+    const resueltos = new Map<number, string>(); // rowNumber → producto_id
+    const pendientesPorNombre = new Map<string, number[]>(); // nombre externo → rowNumbers
+
+    for (const row of parsed.rows) {
+      const productoId = this.resolveProductoId(row.productoNombre, nombreToId, aliasToId);
+      if (productoId) {
+        resueltos.set(row.rowNumber, productoId);
+      } else {
+        const key = row.productoNombre.trim();
+        const arr = pendientesPorNombre.get(key) ?? [];
+        arr.push(row.rowNumber);
+        pendientesPorNombre.set(key, arr);
+      }
+    }
+
+    // 6) Matching por IA (batch único) sobre los nombres pendientes.
+    const iaStats = {
+      habilitado: this.matcherAI.enabled,
+      llamados: pendientesPorNombre.size,
+      auto_mapeados: 0,
+      sugeridos: 0,
+    };
+
+    const productoToNombre = new Map<string, string>();
+    for (const p of productos ?? []) productoToNombre.set(p.id, p.nombre);
+
+    /** nombre externo → sugerencia de IA (si la hubo) */
+    const iaPorNombre = new Map<
+      string,
+      { producto_id: string; confianza: number; producto_nombre: string }
+    >();
+
+    if (this.matcherAI.enabled && pendientesPorNombre.size > 0) {
+      const nombres = Array.from(pendientesPorNombre.keys());
+      const matches = await this.matcherAI.matchBatch(
+        (productos ?? []).map((p) => ({ id: p.id, nombre: p.nombre })),
+        nombres,
+      );
+
+      for (const m of matches) {
+        if (!m.producto_id) continue;
+        const prodNombre = productoToNombre.get(m.producto_id) ?? m.producto_id;
+        iaPorNombre.set(m.external_name, {
+          producto_id: m.producto_id,
+          confianza: m.confidence,
+          producto_nombre: prodNombre,
+        });
+
+        if (m.confidence >= AUTO_MATCH_CONFIDENCE) {
+          try {
+            await this.upsertAlias(tiendaId, m.external_name, m.producto_id);
+            for (const rowNum of pendientesPorNombre.get(m.external_name) ?? []) {
+              resueltos.set(rowNum, m.producto_id);
+            }
+            iaStats.auto_mapeados++;
+          } catch (err) {
+            this.log.warn(
+              `No se pudo crear alias auto-matcheado "${m.external_name}": ${(err as Error).message}`,
+            );
+          }
+        } else if (m.confidence >= SUGGEST_CONFIDENCE) {
+          iaStats.sugeridos++;
+        }
+      }
+    }
+
+    // 7) Pasada final: crear/actualizar pedidos con los productos resueltos.
     const result: ImportResult = {
       total: parsed.rows.length,
       creados: 0,
@@ -94,15 +184,27 @@ export class ImportsService {
       saltadosPorEstado: parsed.skippedByEstado.length,
       erroresValidacion: parsed.errors.map((e) => ({ fila: e.rowNumber, mensaje: e.message })),
       sinMapear: [],
+      ia: iaStats,
     };
 
     for (const row of parsed.rows) {
-      const productoId = this.resolveProductoId(row.productoNombre, nombreToId, aliasToId);
+      const productoId = resueltos.get(row.rowNumber);
       if (!productoId) {
+        const sug = iaPorNombre.get(row.productoNombre.trim());
+        const sugerencia =
+          sug && sug.confianza >= SUGGEST_CONFIDENCE
+            ? {
+                producto_id: sug.producto_id,
+                producto_nombre: sug.producto_nombre,
+                confianza: sug.confianza,
+              }
+            : undefined;
+
         result.sinMapear.push({
           alias_externo: row.productoNombre,
           id_pedido: row.externalOrderId,
           fila: row.rowNumber,
+          ...(sugerencia ? { sugerencia } : {}),
         });
         continue;
       }
@@ -126,6 +228,23 @@ export class ImportsService {
     }
 
     return result;
+  }
+
+  /** Helper interno: upsert de alias (idempotente). */
+  private async upsertAlias(tiendaId: string, aliasExterno: string, productoId: string) {
+    const { error } = await this.supabase
+      .getClient()
+      .from('producto_aliases')
+      .upsert(
+        {
+          tienda_id: tiendaId,
+          producto_id: productoId,
+          external_source: 'rocket',
+          alias_externo: aliasExterno.trim(),
+        },
+        { onConflict: 'tienda_id,external_source,alias_externo' },
+      );
+    if (error) throw error;
   }
 
   /**
@@ -162,6 +281,15 @@ export class ImportsService {
     let clienteId: string;
     if (clienteExistente) {
       clienteId = clienteExistente.id;
+      // Si el cliente existía sin provincia y ahora la tenemos, la
+      // completamos sin sobrescribir otros campos.
+      if (row.provincia) {
+        await db
+          .from('clientes')
+          .update({ provincia: row.provincia })
+          .eq('id', clienteId)
+          .is('provincia', null);
+      }
     } else {
       const { data: nuevoCliente, error: errCli } = await db
         .from('clientes')
@@ -169,6 +297,7 @@ export class ImportsService {
           nombre: row.clienteNombre,
           telefono: telefonoNorm,
           ciudad: row.ciudad,
+          provincia: row.provincia,
           tienda_id: tiendaId,
         })
         .select('id')
@@ -196,6 +325,7 @@ export class ImportsService {
       tienda_id: tiendaId,
       external_source: 'rocket',
       external_order_id: row.externalOrderId,
+      provincia: row.provincia,
     };
     if (createdAt) insertPayload.created_at = createdAt;
     if (row.aplazado) insertPayload.retencion_inicio = new Date().toISOString();

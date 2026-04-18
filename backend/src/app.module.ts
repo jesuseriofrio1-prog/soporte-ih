@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { TiendasModule } from './tiendas/tiendas.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { ImportsModule } from './imports/imports.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ImportsModule } from './imports/imports.module';
     TiendasModule,
     TrackingModule,
     ImportsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [],

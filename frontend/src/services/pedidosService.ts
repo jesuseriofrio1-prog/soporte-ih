@@ -4,6 +4,7 @@ export interface PedidoCliente {
   nombre: string
   telefono: string
   ciudad?: string
+  provincia?: string
 }
 
 export interface PedidoProducto {
@@ -27,6 +28,7 @@ export interface Pedido {
   monto: number
   canal_origen: string | null
   notas: string | null
+  provincia: string | null
   retencion_inicio: string | null
   created_at: string
   updated_at: string

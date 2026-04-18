@@ -6,7 +6,33 @@ export interface ImportResult {
   actualizados: number
   saltadosPorEstado: number
   erroresValidacion: { fila: number; mensaje: string }[]
-  sinMapear: { alias_externo: string; id_pedido: string; fila: number }[]
+  sinMapear: {
+    alias_externo: string
+    id_pedido: string
+    fila: number
+    sugerencia?: {
+      producto_id: string
+      producto_nombre: string
+      confianza: number
+    }
+  }[]
+  ia?: {
+    habilitado: boolean
+    llamados: number
+    auto_mapeados: number
+    sugeridos: number
+  }
+}
+
+export interface WebhookLog {
+  id: string
+  external_source: string
+  event_type: string | null
+  external_order_id: string | null
+  status: string
+  pedido_id: string | null
+  error_mensaje: string | null
+  created_at: string
 }
 
 export interface ProductoAlias {
@@ -44,6 +70,11 @@ const importsService = {
 
   async eliminarAlias(aliasId: string) {
     await api.delete(`/imports/producto-aliases/${aliasId}`)
+  },
+
+  async listWebhookLogs(limit = 50): Promise<WebhookLog[]> {
+    const { data } = await api.get(`/webhooks/rocket/logs?limit=${limit}`)
+    return data
   },
 }
 

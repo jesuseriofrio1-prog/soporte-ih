@@ -316,8 +316,9 @@ onMounted(() => {
           </div>
           <h3 class="text-lg font-bold text-navy">{{ store.clienteActivo.nombre }}</h3>
           <p class="text-sm text-navy/60">{{ store.clienteActivo.telefono }}</p>
-          <p v-if="store.clienteActivo.ciudad" class="text-xs text-navy/40 mt-1">
-            <i class="pi pi-map-marker"></i> {{ store.clienteActivo.ciudad }}
+          <p v-if="store.clienteActivo.ciudad || store.clienteActivo.provincia" class="text-xs text-navy/40 mt-1">
+            <i class="pi pi-map-marker"></i>
+            {{ [store.clienteActivo.ciudad, store.clienteActivo.provincia].filter(Boolean).join(', ') }}
           </p>
 
           <!-- Estadísticas rápidas -->

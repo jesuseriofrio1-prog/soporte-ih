@@ -6,6 +6,7 @@ export interface Cliente {
   nombre: string
   telefono: string
   ciudad: string | null
+  provincia: string | null
   notas: string | null
   created_at: string
   pedidos_total: number
