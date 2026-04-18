@@ -27,10 +27,24 @@ Copia los archivos `.env.example` a `.env` en `/backend` y `/frontend` y complet
 
 ## Base de datos
 
-Las migraciones SQL viven en `backend/supabase/migrations/`. Aplícalas en orden contra tu proyecto Supabase:
+Las migraciones SQL viven en `backend/supabase/migrations/` y se aplican en orden:
 
-1. `001_initial_schema.sql` — tablas base (productos, clientes, pedidos, historial).
-2. `002_multi_tienda.sql` — tabla `tiendas`, `tienda_id` en las demás tablas, ENUM `estado_pedido` actualizado, RPCs `descontar_stock` y `devolver_stock`, vista `dashboard_stats` con agrupación por tienda.
+| # | Archivo | Resumen |
+|---|---------|---------|
+| 001 | `001_initial_schema.sql` | Tablas base (productos, clientes, pedidos, historial) + RLS |
+| 002 | `002_dashboard_functions.sql` | `get_dashboard_stats()`, `get_ventas_semana()` |
+| 003 | `003_canales_stats.sql` | `get_canales_stats()` |
+| 004 | `004_fcm_tokens.sql` | Tabla `fcm_tokens` para push notifications |
+| 005 | `005_atomic_stock.sql` | RPCs `descontar_stock` / `devolver_stock` |
+| 006 | `006_db_size_function.sql` | `get_db_size()` |
+| 007 | `007_clientes_con_stats.sql` | Vista `clientes_con_stats` |
+| 008 | `008_new_estados.sql` | Nuevo flujo de estados (text, sin ENUM) |
+| 009 | `009_pedido_nombre_directo.sql` | `cliente_nombre` / `cliente_telefono` en `pedidos` |
+| 010 | `010_retencion_timer.sql` | `retencion_inicio` en `pedidos` |
+| 011 | `011_multi_tienda.sql` | Tabla `tiendas`, `tienda_id` FK, RPCs por tienda |
+| 012 | `012_colores_extra_tienda.sql` | `color_fondo` / `color_borde` en `tiendas` |
+
+Todas estas migraciones ya están aplicadas en el proyecto Supabase de producción (`yntdsltpcokcxqcbecro`). Los archivos se mantienen en el repo para trazabilidad y para recrear el schema en proyectos nuevos.
 
 ## Deploy Frontend en Vercel
 

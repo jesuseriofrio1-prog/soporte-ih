@@ -1,7 +1,8 @@
 -- ============================================
--- Soporte IH - Schema inicial (legado)
+-- Soporte IH - Schema inicial
 -- 001_initial_schema.sql
--- Nota: los cambios multi-tienda y los estados nuevos están en 002_multi_tienda.sql.
+-- Nota: migraciones posteriores (002-012) agregan funciones, FCM tokens,
+-- estados nuevos, soporte multi-tienda y personalización de colores.
 -- ============================================
 
 -- ===================
