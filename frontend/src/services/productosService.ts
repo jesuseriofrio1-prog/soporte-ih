@@ -12,6 +12,10 @@ export interface Producto {
   costo_unitario: number | null
   /** Fee Rocket promedio por unidad. Null si no se configuró. */
   fee_envio: number | null
+  /** Si true, este producto es un bundle (upgrade de otro). */
+  es_bundle: boolean
+  /** UUID del producto "base" que dispara el bundle (null si no es bundle). */
+  bundle_upgrade_desde: string | null
   created_at: string
   updated_at: string
 }
@@ -24,6 +28,8 @@ export interface CreateProductoPayload {
   icono?: string
   costo_unitario?: number
   fee_envio?: number
+  es_bundle?: boolean
+  bundle_upgrade_desde?: string
   tienda_id?: string
 }
 
@@ -35,6 +41,8 @@ export interface UpdateProductoPayload {
   activo?: boolean
   costo_unitario?: number
   fee_envio?: number
+  es_bundle?: boolean
+  bundle_upgrade_desde?: string | null
 }
 
 const productosService = {

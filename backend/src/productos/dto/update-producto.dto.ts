@@ -4,8 +4,13 @@ import {
   IsInt,
   IsOptional,
   IsBoolean,
+  Matches,
   Min,
+  ValidateIf,
 } from 'class-validator';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class UpdateProductoDto {
   @IsOptional()
@@ -39,4 +44,14 @@ export class UpdateProductoDto {
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'fee_envio debe ser numérico' })
   @Min(0)
   fee_envio?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  es_bundle?: boolean;
+
+  /** Nullable explícito: enviar null para desvincular el bundle del base. */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(UUID_REGEX, { message: 'bundle_upgrade_desde debe ser UUID o null' })
+  bundle_upgrade_desde?: string | null;
 }

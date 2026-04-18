@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
 import Swal from 'sweetalert2'
 import Dialog from 'primevue/dialog'
@@ -46,9 +46,20 @@ const form = ref({
   // Unit economics: 0 se interpreta como "no configurado" al guardar
   costo_unitario: 0,
   fee_envio: 0,
+  // Bundle cosmético: es_bundle=false ignora bundle_upgrade_desde
+  es_bundle: false,
+  bundle_upgrade_desde: '' as string,
 })
 
 const formErrors = ref<Record<string, string>>({})
+
+// Productos disponibles como base para un bundle (excluye el que se edita
+// y los que ya son bundle — no queremos bundle-of-bundle).
+const productosBase = computed(() =>
+  store.productos.filter((p) =>
+    !p.es_bundle && p.activo && p.id !== productoEditId.value,
+  ),
+)
 
 function abrirModalCrear() {
   editando.value = false
@@ -56,6 +67,7 @@ function abrirModalCrear() {
   form.value = {
     nombre: '', slug: '', precio: 0, stock: 0, icono: '',
     costo_unitario: 0, fee_envio: 0,
+    es_bundle: false, bundle_upgrade_desde: '',
   }
   formErrors.value = {}
   modalVisible.value = true
@@ -72,6 +84,8 @@ function abrirModalEditar(producto: Producto) {
     icono: producto.icono || '',
     costo_unitario: producto.costo_unitario ?? 0,
     fee_envio: producto.fee_envio ?? 0,
+    es_bundle: producto.es_bundle,
+    bundle_upgrade_desde: producto.bundle_upgrade_desde ?? '',
   }
   formErrors.value = {}
   modalVisible.value = true
@@ -106,6 +120,12 @@ async function guardar() {
   const costoPayload = form.value.costo_unitario > 0 ? form.value.costo_unitario : undefined
   const feePayload = form.value.fee_envio > 0 ? form.value.fee_envio : undefined
 
+  // Bundle: si no está marcado, desvincular el base (null). Si está
+  // marcado pero no eligió base, enviamos undefined (mantiene valor previo).
+  const upgradePayload: string | null | undefined = form.value.es_bundle
+    ? (form.value.bundle_upgrade_desde || undefined)
+    : null
+
   try {
     if (editando.value && productoEditId.value) {
       await store.editarProducto(productoEditId.value, {
@@ -115,6 +135,8 @@ async function guardar() {
         icono: form.value.icono || undefined,
         costo_unitario: costoPayload,
         fee_envio: feePayload,
+        es_bundle: form.value.es_bundle,
+        bundle_upgrade_desde: upgradePayload,
       })
       toast.success('Producto actualizado')
     } else {
@@ -126,6 +148,8 @@ async function guardar() {
         icono: form.value.icono || undefined,
         costo_unitario: costoPayload,
         fee_envio: feePayload,
+        es_bundle: form.value.es_bundle,
+        bundle_upgrade_desde: form.value.es_bundle ? (form.value.bundle_upgrade_desde || undefined) : undefined,
       })
       toast.success('Producto creado')
     }
@@ -406,6 +430,34 @@ onMounted(() => {
               ({{ (((form.precio - form.costo_unitario - form.fee_envio) / form.precio) * 100).toFixed(1) }}%)
             </span>
           </p>
+        </div>
+
+        <!-- Bundle upgrade -->
+        <div class="pt-2 border-t hairline">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input v-model="form.es_bundle" type="checkbox" class="rounded" />
+            <span class="text-[12px] font-medium">Este producto es un bundle (upgrade)</span>
+          </label>
+          <p class="text-[11px] text-ink-faint mt-1">
+            Cuando el cliente elige el producto base en el formulario público, se le sugiere este bundle.
+          </p>
+          <div v-if="form.es_bundle" class="mt-3">
+            <label class="block text-[11px] font-medium text-ink-muted mb-1">
+              Se sugiere cuando el cliente elige:
+            </label>
+            <select
+              v-model="form.bundle_upgrade_desde"
+              class="w-full px-3 py-2 border border-lavanda-medio rounded-lg bg-lavanda/30 text-navy text-[13px] focus:outline-none focus:border-mauve transition"
+            >
+              <option value="">— Elegir producto base —</option>
+              <option v-for="p in productosBase" :key="p.id" :value="p.id">
+                {{ p.nombre }} (${{ Number(p.precio).toFixed(2) }})
+              </option>
+            </select>
+            <p v-if="productosBase.length === 0" class="text-[11px] mt-1" style="color: var(--amber-fg);">
+              No hay productos base disponibles (todos son bundles o están inactivos).
+            </p>
+          </div>
         </div>
 
         <!-- Icono -->

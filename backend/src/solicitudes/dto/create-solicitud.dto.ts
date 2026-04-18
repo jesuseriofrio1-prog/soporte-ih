@@ -63,4 +63,10 @@ export class CreateSolicitudPublicDto {
   @IsOptional()
   @Matches(UUID_REGEX, { message: 'producto_id debe ser UUID válido' })
   producto_id?: string;
+
+  /** Código de referido capturado del URL (?ref=XYZ). Opcional. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  referido_codigo?: string;
 }

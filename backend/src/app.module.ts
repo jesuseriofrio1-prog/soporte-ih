@@ -19,6 +19,7 @@ import { SolicitudesModule } from './solicitudes/solicitudes.module';
 import { TemplatesModule } from './templates/templates.module';
 import { DireccionesModule } from './direcciones/direcciones.module';
 import { TrackingPublicoModule } from './tracking-publico/tracking-publico.module';
+import { ReferidosModule } from './referidos/referidos.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { TrackingPublicoModule } from './tracking-publico/tracking-publico.modul
     TemplatesModule,
     DireccionesModule,
     TrackingPublicoModule,
+    ReferidosModule,
   ],
   controllers: [AppController],
   providers: [

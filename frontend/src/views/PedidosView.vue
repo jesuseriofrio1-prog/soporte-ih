@@ -12,6 +12,7 @@ import PedidosBulkBar from '../components/pedidos/PedidosBulkBar.vue'
 import { abrirWhatsApp } from '../composables/useWhatsApp'
 import { useTemplatesStore } from '../stores/templates'
 import { renderTemplate } from '../services/templatesService'
+import referidosService from '../services/referidosService'
 import { usePedidosStore } from '../stores/pedidos'
 import { useProductosStore } from '../stores/productos'
 import { useTiendaStore } from '../stores/tienda'
@@ -268,6 +269,37 @@ function abrirTracking(guia: string) {
   window.open(`https://www.servientrega.com.ec/Tracking/?guia=${guia}&tipo=GUIA`, '_blank')
 }
 
+/**
+ * Crea un código de referido para el cliente del pedido y copia al
+ * clipboard un mensaje listo para enviar por WhatsApp.
+ */
+async function generarReferido(pedido: Pedido) {
+  if (!tiendaStore.tiendaActiva) return
+  const nombre = pedido.cliente_nombre || pedido.clientes?.nombre
+  const tel = pedido.cliente_telefono || pedido.clientes?.telefono
+  if (!nombre) {
+    toast.warning('El pedido no tiene nombre de cliente para generar el referido')
+    return
+  }
+  try {
+    const ref = await referidosService.create({
+      tienda_id: tiendaStore.tiendaActiva.id,
+      cliente_id: pedido.cliente_id || undefined,
+      cliente_nombre: nombre,
+      cliente_tel: tel || undefined,
+    })
+    const tienda = tiendaStore.tiendaActiva.nombre
+    const slug = tiendaStore.tiendaActiva.slug
+    const link = `${window.location.origin}/p/${slug}?ref=${encodeURIComponent(ref.codigo)}`
+    const mensaje = `¡Hola ${nombre}! 🎁\n\nTe comparto tu código personal de referido en ${tienda}:\n\nCódigo: *${ref.codigo}*\nLink directo: ${link}\n\nCuando alguien use tu link para pedir, te aviso y te mando un descuento especial por recomendar. ¡Gracias! ✨`
+    await navigator.clipboard.writeText(mensaje)
+    toast.success(`Código ${ref.codigo} creado y mensaje copiado al portapapeles`)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message || 'No se pudo generar el referido')
+  }
+}
+
 // ──────────────── Sincronización Servientrega ────────────────
 const sincronizando = ref(false)
 
@@ -390,6 +422,7 @@ onMounted(() => {
       @abrir-wa="abrirWAModal"
       @abrir-tracking="abrirTracking"
       @eliminar="eliminarPedido"
+      @generar-referido="generarReferido"
     />
 
     <PedidoCrearModal

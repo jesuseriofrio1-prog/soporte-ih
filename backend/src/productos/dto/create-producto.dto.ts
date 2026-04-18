@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsString,
   IsNotEmpty,
   IsNumber,
@@ -7,6 +8,9 @@ import {
   Matches,
   Min,
 } from 'class-validator';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class CreateProductoDto {
   @IsString()
@@ -43,6 +47,16 @@ export class CreateProductoDto {
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'fee_envio debe ser numérico' })
   @Min(0, { message: 'fee_envio no puede ser negativo' })
   fee_envio?: number;
+
+  /** Si true, este producto es un bundle (upgrade de otro producto base). */
+  @IsOptional()
+  @IsBoolean()
+  es_bundle?: boolean;
+
+  /** UUID del producto "base" que dispara la sugerencia de este bundle. */
+  @IsOptional()
+  @Matches(UUID_REGEX, { message: 'bundle_upgrade_desde debe ser UUID' })
+  bundle_upgrade_desde?: string;
 
   @IsString()
   @IsNotEmpty({ message: 'tienda_id es requerido' })

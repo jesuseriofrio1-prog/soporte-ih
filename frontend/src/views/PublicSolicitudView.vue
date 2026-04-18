@@ -5,11 +5,19 @@ import solicitudesService, {
   type TiendaPublica,
   type ProductoPublico,
 } from '../services/solicitudesService'
+import referidosService from '../services/referidosService'
 
 const route = useRoute()
 
 const tiendaSlug = computed(() => route.params.tiendaSlug as string)
 const productoSlug = computed(() => (route.params.productoSlug as string) || '')
+
+// Captura el código de referido del query ?ref=XXX. Se envía con la
+// solicitud y se muestra validado en la UI ("Has sido referido por X").
+const referidoCodigo = computed(() =>
+  typeof route.query.ref === 'string' ? route.query.ref.trim().toUpperCase() : '',
+)
+const referidoInfo = ref<{ referente_nombre: string; valido: boolean } | null>(null)
 
 const loading = ref(true)
 const loadError = ref<string | null>(null)
@@ -42,6 +50,14 @@ const PROVINCIAS_EC = [
 ]
 
 onMounted(async () => {
+  // Validar código de referido (si viene en el URL) — es fire-and-forget
+  // porque no queremos bloquear la carga principal si falla.
+  if (referidoCodigo.value) {
+    referidosService.validarPublico(tiendaSlug.value, referidoCodigo.value)
+      .then((v) => { referidoInfo.value = v })
+      .catch(() => { referidoInfo.value = null })
+  }
+
   try {
     if (productoSlug.value) {
       const { tienda: t, producto: p } = await solicitudesService.productoPublico(
@@ -110,6 +126,7 @@ async function submit() {
         cantidad: form.value.cantidad,
         notas: form.value.notas.trim() || undefined,
         producto_id: productoSlug.value ? undefined : form.value.producto_id || undefined,
+        referido_codigo: referidoCodigo.value || undefined,
       },
       productoSlug.value || undefined,
     )
@@ -130,6 +147,25 @@ const productoActivo = computed<ProductoPublico | null>(() => {
   }
   return null
 })
+
+/**
+ * Bundle sugerido para el producto activo: primer bundle (activo) cuyo
+ * bundle_upgrade_desde coincide con el ID del producto elegido.
+ * Solo aparece si el cliente aún NO eligió ya el bundle.
+ */
+const bundleSugerido = computed<ProductoPublico | null>(() => {
+  const activo = productoActivo.value
+  if (!activo || activo.es_bundle) return null
+  const match = catalogo.value.find(
+    (p) => p.es_bundle && p.bundle_upgrade_desde === activo.id,
+  )
+  return match ?? null
+})
+
+function aceptarBundle() {
+  if (!bundleSugerido.value) return
+  form.value.producto_id = bundleSugerido.value.id
+}
 </script>
 
 <template>
@@ -210,11 +246,57 @@ const productoActivo = computed<ProductoPublico | null>(() => {
           </div>
         </div>
 
+        <!-- Bundle upgrade sugerido -->
+        <div
+          v-if="bundleSugerido"
+          class="mx-5 mt-5 p-4 rounded-xl border-2 border-dashed relative"
+          :style="{ borderColor: 'var(--brand-primary)', background: 'var(--brand-fondo)' }"
+        >
+          <div class="absolute -top-2.5 left-4 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white" :style="{ background: 'var(--brand-primary)' }">
+            ✨ Oferta recomendada
+          </div>
+          <div class="flex items-start gap-3">
+            <div
+              class="w-12 h-12 rounded-lg flex items-center justify-center text-xl shrink-0"
+              :style="{ backgroundColor: 'var(--brand-secondary)' }"
+            >
+              {{ bundleSugerido.icono || '🎁' }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-bold text-gray-800 text-sm">{{ bundleSugerido.nombre }}</p>
+              <p v-if="bundleSugerido.precio && productoActivo?.precio" class="text-xs text-gray-600 mt-0.5">
+                Mejora tu pedido a
+                <span class="font-bold" :style="{ color: 'var(--brand-primary)' }">${{ bundleSugerido.precio.toFixed(2) }}</span>
+                (antes sólo ${{ productoActivo.precio.toFixed(2) }})
+              </p>
+              <button
+                type="button"
+                @click="aceptarBundle"
+                class="mt-2 w-full py-2 rounded-lg text-white font-bold text-xs hover:opacity-90 transition"
+                :style="{ backgroundColor: 'var(--brand-primary)' }"
+              >
+                Quiero esta oferta
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Form -->
         <form @submit.prevent="submit" class="p-6 space-y-4">
           <p class="text-sm text-gray-600">
             Completa tus datos para recibir tu pedido. Nos pondremos en contacto por WhatsApp.
           </p>
+          <div
+            v-if="referidoInfo?.valido"
+            class="flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-medium"
+            style="background: var(--emerald-bg); color: var(--emerald-fg);"
+          >
+            <span>🎁</span>
+            <span>
+              Has sido referido por <b>{{ referidoInfo.referente_nombre }}</b>.
+              Mencioná el código <code class="font-mono font-bold">{{ referidoCodigo }}</code> al confirmar tu pedido.
+            </span>
+          </div>
 
           <!-- Selector de producto si es catálogo general -->
           <div v-if="!productoSlug" class="space-y-1">
@@ -228,7 +310,7 @@ const productoActivo = computed<ProductoPublico | null>(() => {
               :style="{ '--tw-ring-color': 'var(--brand-primary)' }"
             >
               <option value="">— Elige un producto —</option>
-              <option v-for="p in catalogo" :key="p.id" :value="p.id">
+              <option v-for="p in catalogo.filter((x) => !x.es_bundle)" :key="p.id" :value="p.id">
                 {{ p.nombre }}{{ p.precio ? ` — $${p.precio.toFixed(2)}` : '' }}
               </option>
             </select>

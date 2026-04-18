@@ -37,6 +37,9 @@ export interface ProductoPublico {
   nombre: string;
   precio: number | null;
   icono: string | null;
+  /** Si está presente, este producto es un bundle upgrade del producto_id listado. */
+  bundle_upgrade_desde?: string | null;
+  es_bundle?: boolean;
 }
 
 @Injectable()
@@ -76,7 +79,7 @@ export class SolicitudesService {
     const { data, error } = await this.supabase
       .getClient()
       .from('productos')
-      .select('id, slug, nombre, precio, icono')
+      .select('id, slug, nombre, precio, icono, es_bundle, bundle_upgrade_desde')
       .eq('tienda_id', tiendaId)
       .eq('activo', true)
       .order('nombre', { ascending: true });
@@ -113,7 +116,7 @@ export class SolicitudesService {
     const { data, error } = await this.supabase
       .getClient()
       .from('productos')
-      .select('id, slug, nombre, precio, icono')
+      .select('id, slug, nombre, precio, icono, es_bundle, bundle_upgrade_desde')
       .eq('tienda_id', tiendaId)
       .eq('slug', productoSlug)
       .eq('activo', true)
@@ -154,6 +157,9 @@ export class SolicitudesService {
       productoId = data.id;
     }
 
+    // Código de referido normalizado (uppercase) si viene en el body.
+    const refCodigo = params.body.referido_codigo?.trim().toUpperCase() || null;
+
     const { data: solicitud, error } = await this.supabase
       .getClient()
       .from('solicitudes')
@@ -168,12 +174,39 @@ export class SolicitudesService {
         direccion: params.body.direccion.trim(),
         cantidad: params.body.cantidad ?? 1,
         notas: params.body.notas?.trim() || null,
+        referido_codigo: refCodigo,
         ip_origen: params.ip,
         user_agent: params.userAgent?.slice(0, 300) ?? null,
       })
       .select('id, created_at')
       .single();
     if (error) throw error;
+
+    // Incrementa el contador del referido. No bloquea si el código no
+    // existe (puede que el cliente manipulara la URL).
+    if (refCodigo) {
+      try {
+        const { data: ref } = await this.supabase
+          .getClient()
+          .from('referidos')
+          .select('id, usos_count')
+          .eq('tienda_id', tienda.id)
+          .eq('codigo', refCodigo)
+          .maybeSingle();
+        if (ref) {
+          await this.supabase
+            .getClient()
+            .from('referidos')
+            .update({
+              usos_count: (ref.usos_count as number) + 1,
+              ultimo_uso_en: new Date().toISOString(),
+            })
+            .eq('id', ref.id);
+        }
+      } catch (err) {
+        this.log.warn(`No se pudo registrar uso del referido ${refCodigo}: ${(err as Error).message}`);
+      }
+    }
 
     return {
       ok: true,

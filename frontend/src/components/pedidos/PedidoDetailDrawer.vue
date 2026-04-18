@@ -26,6 +26,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:visible': [v: boolean]
+  'generar-referido': [p: Pedido]
   'cambiar-estado': [nuevo: EstadoPedido]
   'toggle-retencion': [p: Pedido]
   editar: [payload: {
@@ -428,6 +429,20 @@ const riesgoAccionable = computed(() =>
               {{ ESTADO_LABELS[trans] || trans }}
             </button>
           </div>
+        </div>
+
+        <!-- Generar referido (solo entregados) -->
+        <div v-if="!editando && pedido.estado === 'ENTREGADO'" class="border-t hairline pt-4 mb-4">
+          <button
+            @click="emit('generar-referido', pedido)"
+            class="w-full h-9 rounded-md border hairline text-[12px] font-medium hover:bg-paper-alt transition flex items-center justify-center gap-2"
+          >
+            <span>🎁</span>
+            Generar código de referido para este cliente
+          </button>
+          <p class="text-[11px] text-ink-faint mt-2 text-center">
+            Crea un link único que el cliente puede compartir.
+          </p>
         </div>
 
         <!-- Acciones avanzadas -->

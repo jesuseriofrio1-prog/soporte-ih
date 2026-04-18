@@ -86,6 +86,12 @@ const routes = [
         meta: { title: 'Unit economics' },
       },
       {
+        path: 'referidos',
+        name: 'referidos',
+        component: () => import('../views/ReferidosView.vue'),
+        meta: { title: 'Referidos' },
+      },
+      {
         path: 'solicitudes',
         name: 'solicitudes',
         component: () => import('../views/SolicitudesView.vue'),
