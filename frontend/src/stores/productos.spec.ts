@@ -121,7 +121,7 @@ describe('useProductosStore', () => {
         makeProducto({ id: 'p1' }),
         makeProducto({ id: 'p2' }),
       ])
-      mockedService.remove.mockResolvedValueOnce(undefined)
+      mockedService.remove.mockResolvedValueOnce(undefined as never)
 
       const store = useProductosStore()
       await store.fetchProductos()
