@@ -4,12 +4,17 @@
  * El mapa está siempre abierto y el cliente tiene que mover/confirmar el
  * marker — lat/lng son obligatorios en el submit del formulario.
  *
+ * IMPORTANTE: este componente NO toca el texto de la dirección. El cliente
+ * escribe su dirección a mano y el mapa solo aporta las coordenadas GPS.
+ * Esto evita el problema de Plus Codes (R4X4+VCW...) y direcciones basura
+ * del reverse-geocoding en zonas residenciales mal indexadas.
+ *
  * Interacción externa:
  *  - prop `targetLocation` (ej. "Guayaquil, Guayas, Ecuador"): cuando cambia,
  *    hacemos forward-geocoding y re-centramos el mapa + movemos el pin ahí.
  *    Así el cliente empieza con el pin en su ciudad y solo lo ajusta unas
  *    cuadras hasta su casa.
- *  - emit 'address' / 'coords' / 'locality' cuando mueve el pin.
+ *  - emit 'coords' cuando mueve el pin.
  *
  * Privacy: la API key está restringida por HTTP-referrer a soporteih.vercel.app
  * + localhost, así que exponerla en el bundle no permite abuso externo.
@@ -24,9 +29,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'address', address: string): void
   (e: 'coords', coords: { lat: number; lng: number }): void
-  (e: 'locality', locality: { provincia?: string; ciudad?: string }): void
 }>()
 
 // Centro por defecto: Quito. Se re-centra apenas el cliente elija ciudad.
@@ -108,10 +111,6 @@ async function initMap() {
       onPinMoved()
     })
 
-    // Si ya tenemos coords (cliente vuelve al form), reverse-geocode una vez.
-    if (props.value) {
-      await reverseGeocode(props.value)
-    }
     // Si ya viene una ciudad elegida, re-centramos al toque.
     if (props.targetLocation) {
       await centrarEnCiudad(props.targetLocation)
@@ -124,40 +123,18 @@ async function initMap() {
   }
 }
 
-// --- Reverse geocoding -----------------------------------------------------
+// --- Pin → coords (sin tocar texto) ----------------------------------------
 
-async function onPinMoved() {
+function onPinMoved() {
   const pos = marker.value?.getPosition()
   if (!pos) return
-  const coords = { lat: pos.lat(), lng: pos.lng() }
-  emit('coords', coords)
-  await reverseGeocode(coords)
-}
-
-async function reverseGeocode(coords: { lat: number; lng: number }) {
-  if (!geocoder.value) return
-  try {
-    const res = await geocoder.value.geocode({ location: coords })
-    const best = res.results?.[0]
-    if (!best) return
-    emit('address', best.formatted_address)
-    const comps = best.address_components || []
-    const locality = {
-      provincia: comps.find((c) =>
-        c.types.includes('administrative_area_level_1'),
-      )?.long_name,
-      ciudad:
-        comps.find((c) => c.types.includes('locality'))?.long_name ||
-        comps.find((c) => c.types.includes('administrative_area_level_2'))
-          ?.long_name,
-    }
-    emit('locality', locality)
-  } catch {
-    // El cliente puede escribir a mano, no bloqueamos.
-  }
+  emit('coords', { lat: pos.lat(), lng: pos.lng() })
 }
 
 // --- Forward geocoding (cuando cambia la ciudad elegida) -------------------
+// Solo re-centra el mapa y mueve el pin al centro de la ciudad como punto de
+// partida. NO modifica el texto de dirección del formulario — eso lo escribe
+// el cliente.
 
 async function centrarEnCiudad(query: string) {
   if (!geocoder.value || !map.value || !marker.value) return
@@ -171,13 +148,9 @@ async function centrarEnCiudad(query: string) {
     const loc = first.geometry.location
     const ll = new window.google.maps.LatLng(loc.lat(), loc.lng())
     map.value.setCenter(ll)
-    map.value.setZoom(DEFAULT_ZOOM_PIN - 2) // un poco más amplio para que ubique su sector
+    map.value.setZoom(DEFAULT_ZOOM_PIN - 2)
     marker.value.setPosition(ll)
-    // Emitimos coords inmediatamente — punto de partida. El cliente
-    // igual debería arrastrar el pin a su cuadra exacta.
     emit('coords', { lat: loc.lat(), lng: loc.lng() })
-    // Reverse-geocode para llenar la dirección textual aproximada.
-    await reverseGeocode({ lat: loc.lat(), lng: loc.lng() })
   } catch {
     // Silencio — si falla el geocoding, el mapa se queda donde estaba.
   }
@@ -224,7 +197,6 @@ function usarMiUbicacion() {
         marker.value.setPosition(ll)
         map.value.setCenter(ll)
         map.value.setZoom(DEFAULT_ZOOM_PIN)
-        reverseGeocode(coords)
       }
     },
     (err) => {

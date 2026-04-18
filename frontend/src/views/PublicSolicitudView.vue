@@ -76,17 +76,11 @@ const mapTargetLocation = computed(() =>
     : '',
 )
 
-function onMapAddress(address: string) {
-  // Cada actualización del pin reescribe la dirección textual. El cliente
-  // puede editar el campo a mano después si quiere agregar detalles.
-  form.value.direccion = address
-}
+// El mapa solo entrega coordenadas. La dirección textual la escribe el
+// cliente y NO se toca — así evitamos Plus Codes ("R4X4+VCW…") y direcciones
+// basura que salen del reverse-geocoding en zonas mal indexadas.
 function onMapCoords(c: { lat: number; lng: number }) {
   coords.value = c
-}
-function onMapLocality(_loc: { provincia?: string; ciudad?: string }) {
-  // Ya no autocompletamos provincia/ciudad desde el mapa — el cliente los
-  // elige explícitamente desde los dropdowns antes de tocar el pin.
 }
 
 const submitting = ref(false)
@@ -490,16 +484,17 @@ function aceptarBundle() {
               v-model="form.direccion"
               type="text"
               required
-              placeholder="Se llena automáticamente al mover el pin"
+              placeholder="Ej. Av. Amazonas N22-30 y Veintimilla, Urb. El Bosque"
               autocomplete="street-address"
               class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
             />
+            <p class="text-[11px] text-gray-500">
+              Escribe calle, número y sector. Luego ubica tu casa en el mapa.
+            </p>
             <MapPicker
               :value="coords"
               :target-location="mapTargetLocation"
-              @address="onMapAddress"
               @coords="onMapCoords"
-              @locality="onMapLocality"
             />
           </div>
 
