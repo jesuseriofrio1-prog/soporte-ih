@@ -42,6 +42,7 @@ soporte-ih/
 | Excel | exceljs (parseo del Resumen Excel de Rocket) |
 | Push | Firebase Cloud Messaging (opcional) |
 | Tracking | Scraping de Servientrega |
+| Mapas | Google Maps JavaScript API + Geocoding (map picker del form público) |
 | Deploy | Vercel (single project, npm workspaces) |
 
 ## Desarrollo local
@@ -146,10 +147,17 @@ Todos bajo `/api`, con validación vía `class-validator` y `ValidationPipe` glo
 
 Los endpoints `/public/*` son `@Public()` (sin JWT) y rate-limited (5 POST/min por IP, 60 GET/min). **El link de compra siempre es por producto** (`/p/:tiendaSlug/:productoSlug`) — el link genérico de catálogo fue removido para simplificar atribución y evitar pedidos sin producto.
 
+El formulario público captura:
+- Datos del cliente (nombre + WhatsApp).
+- **Provincia y ciudad como dropdowns cascada** (24 provincias × 221 cantones de Ecuador; la ciudad se filtra según la provincia elegida). Lista hardcoded en `frontend/src/data/ecuador-geo.ts` alineada con las zonas de ruteo de Rocket/Servientrega.
+- **Dirección textual obligatoria** (el cliente la escribe a mano — el mapa no la autocompleta para evitar Plus Codes feos del reverse-geocoding).
+- **Ubicación GPS obligatoria** vía Google Maps: mapa siempre visible, se re-centra en la ciudad elegida y el cliente arrastra un pin hasta su casa. Coordenadas (`lat`/`lng`) se guardan en `solicitudes` y se copian al `pedido` al auto-enlazar.
+- Referencia opcional para el mensajero + notas del pedido.
+
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | GET | `/public/tiendas/:slug/productos/:productoSlug` | Tienda + producto individual (form público) |
-| POST | `/public/tiendas/:slug/solicitudes?producto=slug` | Crea una **solicitud** (no un pedido) |
+| POST | `/public/tiendas/:slug/solicitudes?producto=slug` | Crea una **solicitud** con `lat`/`lng`/`direccion_referencia` opcionales |
 | GET | `/public/tracking/:code` | Tracking público con marca (route `/t/:code`) |
 | POST | `/referidos` · GET `/referidos?tienda_id=…` | Gestión de códigos de referido |
 | GET | `/public/referidos/validar?tienda_id=…&codigo=…` | Validar código en el form público |
