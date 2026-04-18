@@ -28,21 +28,28 @@ async function loadStorage() {
   }
 }
 
-onMounted(async () => {
-  await tiendaStore.fetchTiendas()
-  aplicarColoresTienda()
-  loadStorage()
-  requestPermission().catch(() => {})
-  onMessageReceived().catch(() => {})
-})
-
-// Cuando cambia la tienda activa, recargar datos y aplicar colores
-watch(() => tiendaStore.tiendaActivaId, () => {
+function recargarDatosTienda() {
   dashStore.fetchAll()
   productosStore.fetchProductos(true)
   pedidosStore.fetchPedidos()
   clientesStore.fetchClientes()
   aplicarColoresTienda()
+}
+
+onMounted(async () => {
+  await tiendaStore.fetchTiendas()
+  // Cargar datos iniciales. El watch de abajo sólo se dispara cuando cambia
+  // tiendaActivaId, pero si la tienda ya estaba cacheada en localStorage el
+  // valor no cambia tras fetchTiendas y el dashboard quedaba en blanco.
+  recargarDatosTienda()
+  loadStorage()
+  requestPermission().catch(() => {})
+  onMessageReceived().catch(() => {})
+})
+
+// Cuando cambia la tienda activa manualmente, recargar datos y colores
+watch(() => tiendaStore.tiendaActivaId, () => {
+  recargarDatosTienda()
 })
 
 function aplicarColoresTienda() {
