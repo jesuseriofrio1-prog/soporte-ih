@@ -37,12 +37,17 @@ export interface CrearSolicitudBody {
   cliente_email?: string
   provincia?: string
   ciudad?: string
-  direccion: string
+  direccion?: string
   /** Texto libre con pistas para el mensajero ("portón azul, timbre del medio"). */
   direccion_referencia?: string
   /** Coordenadas del map picker (WGS84). */
   lat?: number
   lng?: number
+  /** 'DOMICILIO' (default) o 'AGENCIA'. */
+  tipo_entrega?: 'DOMICILIO' | 'AGENCIA'
+  /** Nombre y dirección de la agencia Servientrega (solo si AGENCIA). */
+  agencia_nombre?: string
+  agencia_direccion?: string
   cantidad?: number
   notas?: string
   producto_id?: string

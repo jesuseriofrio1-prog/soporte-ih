@@ -161,6 +161,27 @@ export class SolicitudesService {
     // Código de referido normalizado (uppercase) si viene en el body.
     const refCodigo = params.body.referido_codigo?.trim().toUpperCase() || null;
 
+    // Tipo de entrega: DOMICILIO (default) o AGENCIA. Según el tipo,
+    // los campos obligatorios cambian y los opuestos se guardan NULL.
+    const tipoEntrega = params.body.tipo_entrega === 'AGENCIA' ? 'AGENCIA' : 'DOMICILIO';
+
+    if (tipoEntrega === 'AGENCIA') {
+      if (!params.body.agencia_nombre?.trim() || !params.body.agencia_direccion?.trim()) {
+        throw new BadRequestException(
+          'Para retiro en agencia debes elegir una agencia Servientrega.',
+        );
+      }
+      if (!params.body.provincia?.trim() || !params.body.ciudad?.trim()) {
+        throw new BadRequestException('Selecciona provincia y ciudad.');
+      }
+    } else {
+      if (!params.body.direccion?.trim() || params.body.direccion.trim().length < 5) {
+        throw new BadRequestException('La dirección es obligatoria para envío a domicilio.');
+      }
+    }
+
+    const esDomicilio = tipoEntrega === 'DOMICILIO';
+
     const { data: solicitud, error } = await this.supabase
       .getClient()
       .from('solicitudes')
@@ -172,11 +193,16 @@ export class SolicitudesService {
         cliente_email: params.body.cliente_email?.trim() || null,
         provincia: params.body.provincia?.trim() || null,
         ciudad: params.body.ciudad?.trim() || null,
-        direccion: params.body.direccion.trim(),
+        tipo_entrega: tipoEntrega,
+        direccion: esDomicilio
+          ? params.body.direccion!.trim()
+          : params.body.agencia_direccion!.trim(),
         direccion_referencia:
-          params.body.direccion_referencia?.trim() || null,
-        lat: typeof params.body.lat === 'number' ? params.body.lat : null,
-        lng: typeof params.body.lng === 'number' ? params.body.lng : null,
+          esDomicilio ? params.body.direccion_referencia?.trim() || null : null,
+        lat: esDomicilio && typeof params.body.lat === 'number' ? params.body.lat : null,
+        lng: esDomicilio && typeof params.body.lng === 'number' ? params.body.lng : null,
+        agencia_nombre: esDomicilio ? null : params.body.agencia_nombre!.trim(),
+        agencia_direccion: esDomicilio ? null : params.body.agencia_direccion!.trim(),
         cantidad: params.body.cantidad ?? 1,
         notas: params.body.notas?.trim() || null,
         referido_codigo: refCodigo,
@@ -341,18 +367,20 @@ export class SolicitudesService {
       const db = this.supabase.getClient();
       const { data: sol } = await db
         .from('solicitudes')
-        .select('lat, lng, direccion_referencia')
+        .select('lat, lng, direccion_referencia, tipo_entrega, agencia_nombre, agencia_direccion')
         .eq('tienda_id', tiendaId)
         .eq('rocket_order_id', rocketOrderId)
         .maybeSingle();
       if (!sol) return;
-      if (sol.lat == null && sol.lng == null && !sol.direccion_referencia) return;
       await db
         .from('pedidos')
         .update({
           lat: sol.lat,
           lng: sol.lng,
           direccion_referencia: sol.direccion_referencia,
+          tipo_entrega: sol.tipo_entrega ?? 'DOMICILIO',
+          agencia_nombre: sol.agencia_nombre,
+          agencia_direccion: sol.agencia_direccion,
         })
         .eq('id', pedidoId);
     } catch (err) {

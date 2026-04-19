@@ -1,5 +1,6 @@
 import {
   IsEmail,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -44,10 +45,28 @@ export class CreateSolicitudPublicDto {
   @MaxLength(120)
   ciudad?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(5)
   @MaxLength(300)
-  direccion!: string;
+  direccion?: string;
+
+  /** 'DOMICILIO' (default) o 'AGENCIA' (retira en oficina Servientrega). */
+  @IsOptional()
+  @IsIn(['DOMICILIO', 'AGENCIA'])
+  tipo_entrega?: 'DOMICILIO' | 'AGENCIA';
+
+  /** Nombre corto de la agencia elegida (solo si tipo_entrega === 'AGENCIA'). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  agencia_nombre?: string;
+
+  /** Dirección completa de la agencia Servientrega. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  agencia_direccion?: string;
 
   @IsOptional()
   @IsInt()

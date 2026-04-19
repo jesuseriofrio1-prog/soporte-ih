@@ -13,6 +13,10 @@ import {
   geocodeQuery,
   type ProvinciaEC,
 } from '../data/ecuador-geo'
+import {
+  agenciasDeCiudad,
+  type AgenciaServientrega,
+} from '../data/servientrega-agencias'
 
 const route = useRoute()
 
@@ -35,10 +39,12 @@ const catalogo = ref<ProductoPublico[]>([])
 const form = ref({
   cliente_nombre: '',
   cliente_telefono: '',
+  tipo_entrega: 'DOMICILIO' as 'DOMICILIO' | 'AGENCIA',
   provincia: '',
   ciudad: '',
   direccion: '',
   direccion_referencia: '',
+  agencia_id: '' as string, // índice dentro de agenciasParaCiudad (como key del <select>)
   cantidad: 1,
   notas: '',
   producto_id: '' as string,
@@ -73,6 +79,21 @@ const mapTargetLocation = computed(() =>
   form.value.provincia && form.value.ciudad
     ? geocodeQuery(form.value.provincia, form.value.ciudad)
     : '',
+)
+
+// Agencias Servientrega disponibles para la ciudad elegida. El v-model del
+// dropdown es el índice (stringified) dentro de este array.
+const agenciasParaCiudad = computed<AgenciaServientrega[]>(() =>
+  agenciasDeCiudad(form.value.provincia, form.value.ciudad),
+)
+
+// Si cambia la ciudad, resetear la agencia elegida (la anterior podría
+// pertenecer a otra ciudad).
+watch(
+  () => [form.value.provincia, form.value.ciudad],
+  () => {
+    form.value.agencia_id = ''
+  },
 )
 
 // El mapa solo entrega coordenadas. La dirección textual la escribe el
@@ -168,14 +189,29 @@ async function submit() {
     error.value = 'Selecciona tu ciudad.'
     return
   }
-  if (!form.value.direccion.trim() || form.value.direccion.trim().length < 5) {
-    error.value = 'Escribe tu dirección completa.'
-    return
+
+  // Validación diferenciada por tipo de entrega.
+  const esDomicilio = form.value.tipo_entrega === 'DOMICILIO'
+  let agenciaElegida: AgenciaServientrega | null = null
+
+  if (esDomicilio) {
+    if (!form.value.direccion.trim() || form.value.direccion.trim().length < 5) {
+      error.value = 'Escribe tu dirección completa.'
+      return
+    }
+    if (!coords.value) {
+      error.value = 'Ubica tu casa en el mapa moviendo el pin.'
+      return
+    }
+  } else {
+    const idx = Number(form.value.agencia_id)
+    agenciaElegida = agenciasParaCiudad.value[idx] ?? null
+    if (!agenciaElegida) {
+      error.value = 'Elige la agencia Servientrega donde quieres retirar.'
+      return
+    }
   }
-  if (!coords.value) {
-    error.value = 'Ubica tu casa en el mapa moviendo el pin.'
-    return
-  }
+
   if (!productoSlug.value && !form.value.producto_id) {
     error.value = 'Selecciona el producto que deseas.'
     return
@@ -188,12 +224,17 @@ async function submit() {
       {
         cliente_nombre: form.value.cliente_nombre.trim(),
         cliente_telefono: form.value.cliente_telefono.trim(),
+        tipo_entrega: form.value.tipo_entrega,
         provincia: form.value.provincia || undefined,
         ciudad: form.value.ciudad.trim() || undefined,
-        direccion: form.value.direccion.trim(),
-        direccion_referencia: form.value.direccion_referencia.trim() || undefined,
-        lat: coords.value?.lat,
-        lng: coords.value?.lng,
+        direccion: esDomicilio ? form.value.direccion.trim() : undefined,
+        direccion_referencia: esDomicilio
+          ? form.value.direccion_referencia.trim() || undefined
+          : undefined,
+        lat: esDomicilio ? coords.value?.lat : undefined,
+        lng: esDomicilio ? coords.value?.lng : undefined,
+        agencia_nombre: !esDomicilio ? agenciaElegida!.nombre : undefined,
+        agencia_direccion: !esDomicilio ? agenciaElegida!.direccion : undefined,
         cantidad: form.value.cantidad,
         notas: form.value.notas.trim() || undefined,
         producto_id: productoSlug.value ? undefined : form.value.producto_id || undefined,
@@ -443,6 +484,57 @@ function aceptarBundle() {
             <p class="text-xs text-gray-500">Número ecuatoriano: 10 dígitos empezando con 09.</p>
           </div>
 
+          <!-- ── Tipo de entrega ── -->
+          <div class="space-y-2">
+            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+              ¿Cómo quieres recibir tu pedido?<span class="text-red-500">*</span>
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label
+                class="flex items-start gap-2 p-3 border-2 rounded-lg cursor-pointer transition"
+                :class="
+                  form.tipo_entrega === 'DOMICILIO'
+                    ? 'border-gray-900 bg-gray-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                "
+              >
+                <input
+                  type="radio"
+                  v-model="form.tipo_entrega"
+                  value="DOMICILIO"
+                  class="mt-0.5"
+                />
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-gray-900">Envío a domicilio</p>
+                  <p class="text-xs text-gray-500">
+                    Te lo llevamos hasta tu puerta.
+                  </p>
+                </div>
+              </label>
+              <label
+                class="flex items-start gap-2 p-3 border-2 rounded-lg cursor-pointer transition"
+                :class="
+                  form.tipo_entrega === 'AGENCIA'
+                    ? 'border-gray-900 bg-gray-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                "
+              >
+                <input
+                  type="radio"
+                  v-model="form.tipo_entrega"
+                  value="AGENCIA"
+                  class="mt-0.5"
+                />
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-gray-900">Retiro en agencia</p>
+                  <p class="text-xs text-gray-500">
+                    Retíralo en una oficina Servientrega.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="space-y-1">
               <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
@@ -473,43 +565,84 @@ function aceptarBundle() {
             </div>
           </div>
 
-          <div class="space-y-2">
-            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
-              Dirección completa<span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="form.direccion"
-              type="text"
-              required
-              placeholder="Ej. Av. Amazonas N22-30 y Veintimilla, Urb. El Bosque"
-              autocomplete="street-address"
-              class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
-            />
-            <p class="text-[11px] text-gray-500">
-              Escribe calle, número y sector. Luego ubica tu casa en el mapa.
-            </p>
-            <MapPicker
-              :value="coords"
-              :target-location="mapTargetLocation"
-              @coords="onMapCoords"
-            />
-          </div>
+          <!-- ── Rama DOMICILIO: dirección + mapa ── -->
+          <template v-if="form.tipo_entrega === 'DOMICILIO'">
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Dirección completa<span class="text-red-500">*</span>
+              </label>
+              <input
+                v-model="form.direccion"
+                type="text"
+                required
+                placeholder="Ej. Av. Amazonas N22-30 y Veintimilla, Urb. El Bosque"
+                autocomplete="street-address"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
+              />
+              <p class="text-[11px] text-gray-500">
+                Escribe calle, número y sector. Luego ubica tu casa en el mapa.
+              </p>
+              <MapPicker
+                :value="coords"
+                :target-location="mapTargetLocation"
+                @coords="onMapCoords"
+              />
+            </div>
 
-          <div class="space-y-1">
-            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
-              Referencia (opcional)
-            </label>
-            <input
-              v-model="form.direccion_referencia"
-              type="text"
-              placeholder="Ej. casa blanca con reja verde, timbre del medio"
-              maxlength="200"
-              class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
-            />
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Referencia (opcional)
+              </label>
+              <input
+                v-model="form.direccion_referencia"
+                type="text"
+                placeholder="Ej. casa blanca con reja verde, timbre del medio"
+                maxlength="200"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
+              />
             <p class="text-[11px] text-gray-500">
               Ayuda al mensajero a encontrarte más rápido.
             </p>
           </div>
+          </template>
+
+          <!-- ── Rama AGENCIA: dropdown Servientrega filtrado por ciudad ── -->
+          <template v-else>
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Agencia Servientrega<span class="text-red-500">*</span>
+              </label>
+              <select
+                v-model="form.agencia_id"
+                :disabled="!form.ciudad || agenciasParaCiudad.length === 0"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">
+                  {{
+                    !form.ciudad
+                      ? 'Elige primero provincia y ciudad'
+                      : agenciasParaCiudad.length === 0
+                        ? 'No hay agencias en esta ciudad'
+                        : '— Elegir agencia —'
+                  }}
+                </option>
+                <option
+                  v-for="(a, i) in agenciasParaCiudad"
+                  :key="i"
+                  :value="String(i)"
+                >
+                  {{ a.nombre }} — {{ a.direccion }}
+                </option>
+              </select>
+              <p
+                v-if="form.ciudad && agenciasParaCiudad.length === 0"
+                class="text-[11px] text-amber-700"
+              >
+                Aún no tenemos agencias registradas en {{ form.ciudad }}. Por
+                favor elige "Envío a domicilio" o escríbenos por WhatsApp.
+              </p>
+            </div>
+          </template>
 
           <div class="grid grid-cols-3 gap-3 items-end">
             <div class="space-y-1 col-span-1">
