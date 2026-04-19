@@ -35,7 +35,6 @@ const catalogo = ref<ProductoPublico[]>([])
 const form = ref({
   cliente_nombre: '',
   cliente_telefono: '',
-  cliente_email: '',
   provincia: '',
   ciudad: '',
   direccion: '',
@@ -180,7 +179,6 @@ async function submit() {
       {
         cliente_nombre: form.value.cliente_nombre.trim(),
         cliente_telefono: form.value.cliente_telefono.trim(),
-        cliente_email: form.value.cliente_email.trim() || undefined,
         provincia: form.value.provincia || undefined,
         ciudad: form.value.ciudad.trim() || undefined,
         direccion: form.value.direccion.trim(),
@@ -417,33 +415,19 @@ function aceptarBundle() {
             />
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
-                Teléfono (WhatsApp)<span class="text-red-500">*</span>
-              </label>
-              <input
-                v-model="form.cliente_telefono"
-                type="tel"
-                required
-                placeholder="09XXXXXXXX"
-                inputmode="numeric"
-                autocomplete="tel"
-                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
-              />
-            </div>
-            <div class="space-y-1">
-              <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
-                Email (opcional)
-              </label>
-              <input
-                v-model="form.cliente_email"
-                type="email"
-                placeholder="tu@email.com"
-                autocomplete="email"
-                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
-              />
-            </div>
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+              Teléfono (WhatsApp)<span class="text-red-500">*</span>
+            </label>
+            <input
+              v-model="form.cliente_telefono"
+              type="tel"
+              required
+              placeholder="09XXXXXXXX"
+              inputmode="numeric"
+              autocomplete="tel"
+              class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
+            />
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
