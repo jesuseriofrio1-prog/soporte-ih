@@ -141,14 +141,23 @@ function aplicarColores() {
   document.title = `Comprar en ${tienda.value.nombre}`
 }
 
+function onTelefonoInput(e: Event) {
+  const raw = (e.target as HTMLInputElement).value
+  // Solo dígitos, máx 10. Si escribe + o 593 al inicio, lo limpia.
+  const digitsOnly = raw.replace(/\D/g, '').slice(0, 10)
+  form.value.cliente_telefono = digitsOnly
+  // Forzar el valor visible a coincidir (por si el navegador coló un char raro).
+  ;(e.target as HTMLInputElement).value = digitsOnly
+}
+
 async function submit() {
   error.value = null
   if (!form.value.cliente_nombre.trim() || form.value.cliente_nombre.trim().length < 2) {
     error.value = 'Escribe tu nombre completo.'
     return
   }
-  if (!/^\d{7,15}$/.test(form.value.cliente_telefono.replace(/\D/g, ''))) {
-    error.value = 'Teléfono inválido. Usa sólo números (mínimo 7 dígitos).'
+  if (!/^09\d{8}$/.test(form.value.cliente_telefono)) {
+    error.value = 'Teléfono inválido. Debe empezar con 09 y tener 10 dígitos (ej. 0991234567).'
     return
   }
   if (!form.value.provincia) {
@@ -421,13 +430,17 @@ function aceptarBundle() {
             </label>
             <input
               v-model="form.cliente_telefono"
+              @input="onTelefonoInput"
               type="tel"
               required
-              placeholder="09XXXXXXXX"
+              placeholder="0991234567"
               inputmode="numeric"
               autocomplete="tel"
+              maxlength="10"
+              pattern="09[0-9]{8}"
               class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-2"
             />
+            <p class="text-xs text-gray-500">Número ecuatoriano: 10 dígitos empezando con 09.</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
