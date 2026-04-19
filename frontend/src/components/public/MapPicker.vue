@@ -179,12 +179,39 @@ watch(
 
 const gpsLoading = ref(false)
 const gpsError = ref<string | null>(null)
+// Modal de permiso bloqueado: el navegador no re-pregunta después de un deny,
+// así que mostramos instrucciones para desbloquear desde la barra de dirección.
+const showPermisoModal = ref(false)
+const modalMotivo = ref<'denied' | 'unavailable'>('denied')
 
-function usarMiUbicacion() {
+// Detecta si el navegador es iOS — las instrucciones cambian mucho.
+function esIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+}
+
+async function usarMiUbicacion() {
   if (!navigator.geolocation) {
     gpsError.value = 'Tu navegador no soporta geolocalización.'
     return
   }
+
+  // Chequeo proactivo: si ya fue denegado, mostramos modal sin intentar pedir.
+  // Safari no soporta Permissions API para geolocation — ahí caemos al try/catch.
+  try {
+    if (navigator.permissions) {
+      const status = await navigator.permissions.query({
+        name: 'geolocation' as PermissionName,
+      })
+      if (status.state === 'denied') {
+        modalMotivo.value = 'denied'
+        showPermisoModal.value = true
+        return
+      }
+    }
+  } catch {
+    // Permissions API no soportada — seguimos con getCurrentPosition directo.
+  }
+
   gpsLoading.value = true
   gpsError.value = null
   navigator.geolocation.getCurrentPosition(
@@ -201,10 +228,18 @@ function usarMiUbicacion() {
     },
     (err) => {
       gpsLoading.value = false
-      gpsError.value =
-        err.code === err.PERMISSION_DENIED
-          ? 'No diste permiso de ubicación. Arrastra el pin manualmente.'
-          : 'No se pudo obtener tu ubicación. Arrastra el pin manualmente.'
+      if (err.code === err.PERMISSION_DENIED) {
+        modalMotivo.value = 'denied'
+        showPermisoModal.value = true
+      } else if (err.code === err.POSITION_UNAVAILABLE) {
+        // Típico en Mac con Location Services apagados a nivel del sistema.
+        modalMotivo.value = 'unavailable'
+        showPermisoModal.value = true
+      } else if (err.code === err.TIMEOUT) {
+        gpsError.value = 'Tardó demasiado. Intenta de nuevo o arrastra el pin manualmente.'
+      } else {
+        gpsError.value = 'No se pudo obtener tu ubicación. Arrastra el pin manualmente.'
+      }
     },
     { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
   )
@@ -264,6 +299,99 @@ onBeforeUnmount(() => {
       style="color: #52525b;"
     >
       Cargando mapa…
+    </div>
+
+    <!-- Modal: permiso de ubicación bloqueado -->
+    <div
+      v-if="showPermisoModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style="background: rgba(0,0,0,0.5);"
+      @click.self="showPermisoModal = false"
+    >
+      <div
+        class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"
+        style="color: #18181b;"
+      >
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style="background: #fef3c7;"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2">
+              <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="12" cy="9" r="2.5"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-base font-semibold">
+              {{ modalMotivo === 'unavailable' ? 'Ubicación no disponible' : 'Permiso de ubicación bloqueado' }}
+            </h3>
+            <p class="mt-1 text-sm" style="color: #52525b;">
+              {{
+                modalMotivo === 'unavailable'
+                  ? 'Tu dispositivo no pudo determinar tu ubicación. Revisa:'
+                  : 'Tu navegador bloqueó el acceso a tu ubicación. Para activarlo:'
+              }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-if="modalMotivo === 'unavailable'"
+          class="mt-4 rounded-lg border p-3 text-sm"
+          style="border-color: #e4e4e7; background: #fafafa;"
+        >
+          <p class="font-medium">En Mac:</p>
+          <ol class="mt-1 list-decimal space-y-1 pl-5" style="color: #3f3f46;">
+            <li>Abre <strong>Ajustes del Sistema</strong> → <strong>Privacidad y seguridad</strong> → <strong>Servicios de localización</strong>.</li>
+            <li>Actívalos y asegúrate que <strong>Chrome/Safari</strong> esté permitido.</li>
+            <li>Recarga la página y vuelve a tocar "Usar mi ubicación".</li>
+          </ol>
+          <p class="mt-2 font-medium">En Windows:</p>
+          <ol class="mt-1 list-decimal space-y-1 pl-5" style="color: #3f3f46;">
+            <li>Abre <strong>Configuración</strong> → <strong>Privacidad</strong> → <strong>Ubicación</strong>.</li>
+            <li>Activa "Permitir que las apps accedan a tu ubicación".</li>
+          </ol>
+        </div>
+
+        <div
+          v-else
+          class="mt-4 rounded-lg border p-3 text-sm"
+          style="border-color: #e4e4e7; background: #fafafa;"
+        >
+          <template v-if="esIOS()">
+            <p class="font-medium">En iPhone/iPad (Safari):</p>
+            <ol class="mt-1 list-decimal space-y-1 pl-5" style="color: #3f3f46;">
+              <li>Abre <strong>Ajustes</strong> → <strong>Safari</strong> → <strong>Ubicación</strong>.</li>
+              <li>Selecciona <strong>Preguntar</strong> o <strong>Permitir</strong>.</li>
+              <li>Vuelve aquí y recarga la página.</li>
+            </ol>
+          </template>
+          <template v-else>
+            <p class="font-medium">En tu navegador:</p>
+            <ol class="mt-1 list-decimal space-y-1 pl-5" style="color: #3f3f46;">
+              <li>Toca el ícono de candado 🔒 (o <strong>ⓘ</strong>) a la izquierda de la barra de dirección.</li>
+              <li>Busca <strong>Ubicación</strong> y cámbialo a <strong>Permitir</strong>.</li>
+              <li>Recarga la página y vuelve a tocar "Usar mi ubicación".</li>
+            </ol>
+          </template>
+        </div>
+
+        <p class="mt-3 text-xs" style="color: #71717a;">
+          O simplemente arrastra el pin en el mapa hasta tu casa — también funciona.
+        </p>
+
+        <div class="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            @click="showPermisoModal = false"
+            class="h-9 rounded-lg px-4 text-sm font-medium"
+            style="background: #18181b; color: #fafafa;"
+          >
+            Entendido
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
