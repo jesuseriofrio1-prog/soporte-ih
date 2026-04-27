@@ -292,11 +292,11 @@ function guardar() {
 
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" @click="emit('update:visible', false)"
-          class="px-4 py-2 rounded-lg font-bold border border-lavanda-medio text-navy hover:bg-lavanda transition">
+          class="px-4 py-2 rounded-lg font-bold border hairline text-ink hover:bg-paper-alt transition">
           Cancelar
         </button>
         <button type="submit" :disabled="loading"
-          class="px-6 py-2 rounded-lg font-bold bg-mauve text-white hover:opacity-90 transition shadow-sm disabled:opacity-50">
+          class="px-6 py-2 rounded-lg font-bold bg-ink text-paper hover:opacity-90 transition shadow-sm disabled:opacity-50">
           {{ loading ? 'Guardando...' : 'Crear Pedido' }}
         </button>
       </div>
