@@ -238,21 +238,48 @@ export class ImportsService {
     return result;
   }
 
-  /** Helper interno: upsert de alias (idempotente). */
+  /**
+   * Helper interno: upsert de alias (idempotente).
+   *
+   * El índice único es funcional (`lower(alias_externo)`) — Postgres no puede
+   * resolver `ON CONFLICT (alias_externo)` contra un índice funcional, así
+   * que hacemos select → insert/update manualmente. Match case-insensitive
+   * (consistente con cómo se compara al importar).
+   */
   private async upsertAlias(tiendaId: string, aliasExterno: string, productoId: string) {
-    const { error } = await this.supabase
-      .getClient()
+    const aliasTrim = aliasExterno.trim();
+    const db = this.supabase.getClient();
+
+    const { data: existing, error: errFind } = await db
       .from('producto_aliases')
-      .upsert(
-        {
-          tienda_id: tiendaId,
-          producto_id: productoId,
-          external_source: 'rocket',
-          alias_externo: aliasExterno.trim(),
-        },
-        { onConflict: 'tienda_id,external_source,alias_externo' },
-      );
-    if (error) throw error;
+      .select('id')
+      .eq('tienda_id', tiendaId)
+      .eq('external_source', 'rocket')
+      .ilike('alias_externo', aliasTrim)
+      .maybeSingle();
+    if (errFind) throw errFind;
+
+    if (existing) {
+      const { error } = await db
+        .from('producto_aliases')
+        .update({ producto_id: productoId, alias_externo: aliasTrim })
+        .eq('id', existing.id);
+      if (error) throw error;
+      return existing.id;
+    }
+
+    const { data: inserted, error: errIns } = await db
+      .from('producto_aliases')
+      .insert({
+        tienda_id: tiendaId,
+        producto_id: productoId,
+        external_source: 'rocket',
+        alias_externo: aliasTrim,
+      })
+      .select('id')
+      .single();
+    if (errIns) throw errIns;
+    return inserted!.id;
   }
 
   /**
@@ -430,18 +457,12 @@ export class ImportsService {
       throw new BadRequestException('El producto no pertenece a la tienda indicada');
     }
 
+    const aliasId = await this.upsertAlias(tiendaId, aliasExterno, productoId);
+
     const { data, error } = await db
       .from('producto_aliases')
-      .upsert(
-        {
-          tienda_id: tiendaId,
-          producto_id: productoId,
-          external_source: 'rocket',
-          alias_externo: aliasExterno.trim(),
-        },
-        { onConflict: 'tienda_id,external_source,alias_externo' },
-      )
       .select()
+      .eq('id', aliasId)
       .single();
     if (error) throw error;
     return data;
