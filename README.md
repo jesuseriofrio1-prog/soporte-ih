@@ -115,6 +115,7 @@ Migraciones en `backend/supabase/migrations/` (aplicadas contra el proyecto Supa
 | 024 | `024_referidos.sql` | Tabla `referidos` + `referido_codigo` en `solicitudes`/`pedidos` |
 | 025 | `025_productos_foto.sql` | `foto_url` en `productos` + bucket `producto-fotos` |
 | 026 | `026_direcciones_coordenadas.sql` | `lat` / `lng` / `direccion_referencia` en `solicitudes` y `pedidos` (Google Maps picker) |
+| 027 | `027_tipo_entrega.sql` | `tipo_entrega` (DOMICILIO / AGENCIA) + `agencia_nombre` / `agencia_direccion` en `solicitudes` y `pedidos` |
 
 ## API — endpoints
 
@@ -148,10 +149,13 @@ Todos bajo `/api`, con validación vía `class-validator` y `ValidationPipe` glo
 Los endpoints `/public/*` son `@Public()` (sin JWT) y rate-limited (5 POST/min por IP, 60 GET/min). **El link de compra siempre es por producto** (`/p/:tiendaSlug/:productoSlug`) — el link genérico de catálogo fue removido para simplificar atribución y evitar pedidos sin producto.
 
 El formulario público captura:
-- Datos del cliente (nombre + WhatsApp).
-- **Provincia y ciudad como dropdowns cascada** (24 provincias × 221 cantones de Ecuador; la ciudad se filtra según la provincia elegida). Lista hardcoded en `frontend/src/data/ecuador-geo.ts` alineada con las zonas de ruteo de Rocket/Servientrega.
-- **Dirección textual obligatoria** (el cliente la escribe a mano — el mapa no la autocompleta para evitar Plus Codes feos del reverse-geocoding).
-- **Ubicación GPS obligatoria** vía Google Maps: mapa siempre visible, se re-centra en la ciudad elegida y el cliente arrastra un pin hasta su casa. Coordenadas (`lat`/`lng`) se guardan en `solicitudes` y se copian al `pedido` al auto-enlazar.
+- Datos del cliente: nombre + **teléfono WhatsApp ecuatoriano** (validación estricta: 10 dígitos empezando con `09`, sanitización en tiempo real).
+- **Tipo de entrega** (toggle obligatorio):
+  - **Domicilio**: dirección + mapa con pin (flujo completo).
+  - **Retiro en agencia Servientrega**: dropdown con 739 agencias reales filtradas por provincia/ciudad. La data se sincroniza desde el endpoint oficial de servientrega.com.ec con los scripts de `scripts/`.
+- **Provincia y ciudad como dropdowns cascada** (24 provincias × 221 cantones de Ecuador). Lista en `frontend/src/data/ecuador-geo.ts`.
+- **Dirección textual** + **GPS obligatorio** (solo en modo domicilio): mapa siempre visible, se re-centra en la ciudad elegida y el cliente arrastra un pin hasta su casa. Coordenadas (`lat`/`lng`) se guardan en `solicitudes` y se copian al `pedido` al auto-enlazar.
+- **Modal guiado para permisos GPS bloqueados**: si el navegador denegó la ubicación o el sistema operativo tiene Servicios de Localización apagados, se muestra un modal con instrucciones específicas por plataforma (iOS, Mac, Windows) en vez de un error críptico.
 - Referencia opcional para el mensajero + notas del pedido.
 
 | Método | Ruta | Descripción |
@@ -198,6 +202,8 @@ Cuando el import de Rocket encuentra un nombre que no está ni en el catálogo n
 - **Sin `ANTHROPIC_API_KEY`** → matcher opera como no-op (la importación sigue funcionando)
 
 Ver `backend/src/imports/producto-matcher.ts`.
+
+> **Nota técnica:** la tabla `producto_aliases` tiene un índice único *funcional* sobre `(tienda_id, external_source, lower(alias_externo))`. Postgres no resuelve `ON CONFLICT` contra índices funcionales, así que el upsert se implementa como `select` + `insert`/`update` manual con `ilike` (ver `imports.service.ts` → `upsertAlias`). Sin este patrón, cualquier guardado de alias devuelve 500.
 
 ## Autenticación
 
