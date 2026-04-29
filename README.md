@@ -132,7 +132,7 @@ Todos bajo `/api`, con validación vía `class-validator` y `ValidationPipe` glo
 | GET / POST / PATCH / DELETE | `/clientes[/:id]` | CRM |
 | GET / POST / PATCH / DELETE | `/pedidos[/:id]` | Pedidos + estado + retención |
 | GET | `/dashboard/{stats,ventas-semana,canales,storage}` | KPIs del panel |
-| POST | `/tracking/sincronizar?tienda_id=…` | Scraping de Servientrega |
+| POST | `/tracking/sincronizar?tienda_id=…` | Scraping de Servientrega — concurrencia 4 con timeout de 8s por guía. Excluye estados terminales (`ENTREGADO`, `Reportado Entregado…`, `DEVUELTO`, `Devuelto de…`, `DEVOLUCION…`) pero re-procesa `NO_ENTREGADO` (re-intentable) |
 | POST | `/notifications/{register-token,check-alertas}` | FCM |
 
 ### Integración con Rocket Ecuador
