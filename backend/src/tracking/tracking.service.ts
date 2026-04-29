@@ -52,9 +52,20 @@ export class TrackingService {
   async consultarGuia(guia: string): Promise<TrackingResult> {
     try {
       const url = `https://www.servientrega.com.ec/Tracking/?guia=${guia}&tipo=GUIA`;
-      const response = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-      });
+      // Servientrega.com.ec puede tardar ~30s — abortamos a los 8s para que
+      // una guía lenta no bloquee el sync completo (la función Vercel
+      // tiene 60s totales).
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 8000);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: ctl.signal,
+        });
+      } finally {
+        clearTimeout(t);
+      }
 
       if (!response.ok) {
         return { guia, estado_servientrega: null, estado_mapeado: null, fecha_envio: null, destino: null, error: `HTTP ${response.status}` };
@@ -117,37 +128,42 @@ export class TrackingService {
 
     let actualizados = 0;
 
-    // Consultar cada guía (con delay para no saturar)
-    for (const pedido of pedidos) {
-      const tracking = await this.consultarGuia(pedido.guia);
+    // Procesar en paralelo con concurrencia limitada (4 a la vez).
+    // Servientrega puede tardar hasta 8s por guía (timeout interno) — secuencial
+    // con N=10 guías saturaría el timeout de Vercel. Con concurrencia 4 y N=10
+    // tardamos ceil(10/4)*8 = 24s en el peor caso, dentro de los 60s de la función.
+    const CONCURRENCY = 4;
+    for (let i = 0; i < pedidos.length; i += CONCURRENCY) {
+      const chunk = pedidos.slice(i, i + CONCURRENCY);
+      const trackings = await Promise.all(chunk.map((p) => this.consultarGuia(p.guia)));
 
-      if (tracking.estado_servientrega && tracking.estado_servientrega !== pedido.estado) {
-        // Guardar el estado exacto de Servientrega
-        await db
-          .from('pedidos')
-          .update({ estado: tracking.estado_servientrega })
-          .eq('id', pedido.id);
+      for (let j = 0; j < chunk.length; j++) {
+        const pedido = chunk[j];
+        const tracking = trackings[j];
 
-        // Registrar en historial
-        await db.from('historial_estados').insert({
-          pedido_id: pedido.id,
+        if (tracking.estado_servientrega && tracking.estado_servientrega !== pedido.estado) {
+          await db
+            .from('pedidos')
+            .update({ estado: tracking.estado_servientrega })
+            .eq('id', pedido.id);
+
+          await db.from('historial_estados').insert({
+            pedido_id: pedido.id,
+            estado_anterior: pedido.estado,
+            estado_nuevo: tracking.estado_servientrega,
+            nota: 'Actualizado desde Servientrega',
+          });
+
+          actualizados++;
+        }
+
+        resultados.push({
+          guia: pedido.guia,
           estado_anterior: pedido.estado,
           estado_nuevo: tracking.estado_servientrega,
-          nota: 'Actualizado desde Servientrega',
+          estado_servientrega: tracking.estado_servientrega,
         });
-
-        actualizados++;
       }
-
-      resultados.push({
-        guia: pedido.guia,
-        estado_anterior: pedido.estado,
-        estado_nuevo: tracking.estado_servientrega,
-        estado_servientrega: tracking.estado_servientrega,
-      });
-
-      // Delay de 500ms entre consultas para no saturar
-      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     return {

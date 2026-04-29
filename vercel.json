@@ -8,7 +8,7 @@
   "functions": {
     "api/index.ts": {
       "includeFiles": "backend/dist/**",
-      "maxDuration": 30
+      "maxDuration": 60
     }
   },
   "rewrites": [
