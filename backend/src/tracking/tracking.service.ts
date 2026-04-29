@@ -99,23 +99,45 @@ export class TrackingService {
     }
   }
 
+  /**
+   * Estados terminales (no se vuelven a sincronizar).
+   *
+   * Importante: NO_ENTREGADO NO es terminal — el mensajero puede reintentar
+   * y el estado puede pasar a EN_RUTA / ENTREGADO en el siguiente intento.
+   * Por eso filtramos por patrones exactos en vez de un ILIKE '%entregado%'
+   * genérico (que matchearía también NO_ENTREGADO).
+   */
+  private static readonly TERMINAL_PATTERNS: RegExp[] = [
+    /^entregado$/i,
+    /^reportado entregado/i,
+    /^devuelto$/i,
+    /^devuelto de/i,
+    /^devolucion/i,
+    /^devolución/i,
+  ];
+
+  private esEstadoTerminal(estado: string | null | undefined): boolean {
+    if (!estado) return false;
+    const s = estado.trim();
+    return TrackingService.TERMINAL_PATTERNS.some((re) => re.test(s));
+  }
+
   /** Sincronizar todos los pedidos activos de una tienda con Servientrega */
   async sincronizarTienda(tiendaId: string) {
     const db = this.supabase.getClient();
 
-    // Obtener pedidos con guía que no estén en estado final
-    const { data: pedidos, error } = await db
+    // Traemos todos los pedidos con guía y filtramos en JS — más claro que
+    // armar una OR-clause en supabase-js para distinguir "ENTREGADO"
+    // (terminal) de "NO_ENTREGADO" (re-intentable).
+    const { data: todos, error } = await db
       .from('pedidos')
       .select('id, guia, estado')
       .eq('tienda_id', tiendaId)
-      .not('guia', 'eq', '')
-      .not('estado', 'ilike', '%entregado%')
-      .not('estado', 'ilike', '%devuelto%')
-      .not('estado', 'ilike', '%devolucion%')
-      .not('estado', 'ilike', '%devolución%');
+      .not('guia', 'eq', '');
 
     if (error) throw error;
-    if (!pedidos || pedidos.length === 0) {
+    const pedidos = (todos ?? []).filter((p) => !this.esEstadoTerminal(p.estado));
+    if (pedidos.length === 0) {
       return { total: 0, actualizados: 0, resultados: [] };
     }
 
